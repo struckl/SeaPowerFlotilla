@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- .NET Framework 4.8 ships with every Windows 10/11: one small exe, nothing to install. -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SeaPowerFlotilla</AssemblyName>
+    <RootNamespace>Flotilla</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>R.A.T.S. Flotilla</Product>
+    <AssemblyTitle>R.A.T.S. Flotilla - several Sea Power installs</AssemblyTitle>
+    <Company>R.A.T.S.</Company>
+    <Copyright>Copyright (c) 2026 Lukas Struckl, MIT License</Copyright>
+    <ApplicationIcon>flotilla.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+</Project>
