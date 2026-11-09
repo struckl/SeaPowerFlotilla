@@ -64,7 +64,7 @@ namespace Flotilla
             var workshop = WorkshopDir(fleet);
             if (Directory.Exists(workshop))
                 foreach (var dir in Directory.GetDirectories(workshop).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
-                    if (ulong.TryParse(Path.GetFileName(dir), out var id))
+                    if (ulong.TryParse(Path.GetFileName(dir), out var id) && !File.Exists(Path.Combine(dir, AppHome.ExeName)))  // Flotilla's own item is no mod
                         mods.Add(Describe(dir, id, false));
             return mods;
         }

@@ -13,7 +13,9 @@ Download `SeaPowerFlotilla-<version>.zip` from [Releases](https://github.com/str
 folder that stays (desktop shortcuts point there) and start `SeaPowerFlotilla.exe`. Nothing to install: it needs .NET Framework 4.8,
 which every Windows 10 and 11 has. The exe is not signed, so Windows may say "unknown publisher": *More info* → *Run anyway*.
 
-It is not a game mod: it does not go into the game folder and is not on the Steam Workshop.
+Or subscribe on the Steam Workshop and start `SeaPowerFlotilla.exe` once from the item's folder; it moves to `%LOCALAPPDATA%\R.A.T.S. Flotilla\App` and picks up newer Workshop versions by itself.
+
+It is not a game mod: its entry in the game's Mods menu does nothing and can stay off.
 
 ## Use
 

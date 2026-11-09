@@ -25,4 +25,11 @@ Copy-Item (Join-Path $repo 'docs\readme-download.txt') (Join-Path $stage 'README
 $zip = Join-Path $repo "dist\SeaPowerFlotilla-$version.zip"
 Remove-Item $zip -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
+
+# The Workshop content: the same app plus the _info.ini that makes the game list the item
+$workshop = Join-Path $repo 'dist\workshop'
+Remove-Item $workshop -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory $workshop | Out-Null
+Copy-Item (Join-Path $stage '*') $workshop
+Copy-Item (Join-Path $repo 'workshop\_info.ini') $workshop
 Write-Host "$zip ($([math]::Round((Get-Item $zip).Length / 1KB)) KB)"

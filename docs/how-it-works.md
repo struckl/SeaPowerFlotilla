@@ -55,6 +55,12 @@ differs, and removes game files that the Steam install no longer has. It never t
 `user`, `ACConfigs` or `UserData`, and never copies mod folders from the Steam install. If a game update ever adds a new folder to
 StreamingAssets, Flotilla takes it for a mod folder and leaves it out; the list `GameStreaming` in `src/Flotilla/Game.cs` then needs it.
 
+## From the Workshop
+
+Steam can replace or remove a Workshop folder at any time, so Flotilla does not run from one. Started there, it copies itself to
+`%LOCALAPPDATA%\R.A.T.S. Flotilla\App`, offers a desktop shortcut the first time and continues from that copy. When that copy starts and the
+Workshop folder holds a newer version, it hands over to it and the newer version replaces it. Flotilla's own item is left out of its Mods window.
+
 ## Files of Flotilla itself
 
 - `%LOCALAPPDATA%\R.A.T.S. Flotilla\settings.ini`: the copies folder and, if it was located by hand, the Sea Power folder.

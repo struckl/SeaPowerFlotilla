@@ -28,6 +28,7 @@ namespace Flotilla
                     fleet.Play(install);
                     return 0;
                 }
+                if (AppHome.HandOver(fleet)) return 0;
                 Application.Run(new MainForm(fleet));
                 return 0;
             }

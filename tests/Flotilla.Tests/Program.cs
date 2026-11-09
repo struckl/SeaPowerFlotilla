@@ -197,6 +197,15 @@ static class Tests
         File.Delete(cleanIni);
         Throws(() => ModList.Read(fleet, clean), "copy never started: asks to start it once");
 
+        // Workshop start: recognised, placed outside the Workshop, own item hidden from the mod lists, versions compared as numbers
+        Check(AppHome.InWorkshop(@"E:\Games\steamapps\workshop\content\1286220\999\SeaPowerFlotilla.exe") && !AppHome.InWorkshop(@"C:\Tools\SeaPowerFlotilla.exe"), "Workshop path recognised");
+        Check(AppHome.IsNewer("0.10.0.0", "0.9.0.0") && !AppHome.IsNewer("0.1.0.0", "0.1.0.0") && !AppHome.IsNewer("0.1.0", "0.2.0") && !AppHome.IsNewer("?", "0.1.0"), "versions compared as numbers");
+        var ownItem = Path.Combine(workshop, "999"); Put(ownItem, AppHome.ExeName, "new"); Put(ownItem, AppHome.ExeName + ".config", "cfg"); Put(ownItem, "_info.ini");
+        var home = Path.Combine(box, "AppHome"); Put(home, AppHome.ExeName, "old");
+        AppHome.Place(Path.Combine(ownItem, AppHome.ExeName), home);
+        Check(File.ReadAllText(Path.Combine(home, AppHome.ExeName)) == "new" && File.Exists(Path.Combine(home, AppHome.ExeName + ".config")), "placed, replacing an older copy");
+        Check(!ModList.Read(fleet, setup).Any(m => m.Folder == "999"), "Flotilla's own Workshop item is not listed as a mod");
+
         // Rename: the folder follows, data stays, other names and states refused
         var renamed = fleet.Rename(setup, "Pacific (DCM + 80 mods)");
         Check(renamed.Name == "Pacific (DCM + 80 mods)" && Directory.Exists(renamed.Dir) && !Directory.Exists(setup.Dir), "renamed with + and brackets");

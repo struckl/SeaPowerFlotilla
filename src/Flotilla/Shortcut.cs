@@ -9,6 +9,25 @@ namespace Flotilla
         static string DesktopPath(string name) =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"Sea Power ({name}).lnk");
 
+        /// <summary>"R.A.T.S. Flotilla.lnk" on the desktop: starts the app itself.</summary>
+        public static void MakeAppShortcut(string exe)
+        {
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            dynamic shell = Activator.CreateInstance(shellType);
+            try
+            {
+                dynamic link = shell.CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Program.Title + ".lnk"));
+                link.TargetPath = exe;
+                link.WorkingDirectory = Path.GetDirectoryName(exe);
+                link.IconLocation = exe + ",0";
+                link.Save();
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+            }
+        }
+
         /// <summary>After a rename: a shortcut the copy already had follows the new name.</summary>
         public static void Renamed(string oldName, Install install)
         {
