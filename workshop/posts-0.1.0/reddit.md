@@ -1,7 +1,3 @@
-**Title:** R.A.T.S. Flotilla: a test bench for Sea Power. Is it the game, or is it your mods?
-
----
-
 ## R.A.T.S. Flotilla – stop testing on the install you actually play
 
 Something broke. Was it the game, or one of the 47 mods you swore were fine? Now you can find out without taking your game apart.
