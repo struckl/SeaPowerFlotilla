@@ -145,6 +145,58 @@ static class Tests
         Check(!c.Any(x => x.StartsWith("BepInEx") || x == "winhttp.dll"), "update: clean stays clean");
         Check(fleet.Update(setup, null, CancellationToken.None).Copied == 0, "update twice: nothing to do");
 
+        // Mods per copy: order and switches kept, other sections untouched, unknown entries preserved, only this copy changes
+        var workshop = ModList.WorkshopDir(fleet);
+        Check(workshop == Path.Combine(box, "steamapps", "workshop", "content", "1286220"), "Workshop folder found");
+        Put(workshop, @"111\_info.ini", "[Language_en]\r\nName=Ship Pack\r\nDescription=d\r\n[Compatibility]\r\nApproximateVersion=0.8.5\r\n"); Put(workshop, @"222\_info.ini");
+        var ini = Path.Combine(setup.DataDir, "usersettings.ini");
+        var cleanIni = Path.Combine(clean.DataDir, "usersettings.ini");
+        File.WriteAllText(ini, "[A]\r\nx=1\r\n[LoadOrder]\r\nMod2Directory=111,False,111\r\nMod1Directory=SeaPowerTopo,True,0\r\nMod3Directory=Gone,True,0\r\nNumberOfModFiles=3\r\nother=5\r\n[B]\r\ny=2\r\n");
+        File.WriteAllText(cleanIni, "[A]\r\nx=9\r\n");
+        var list = ModList.Read(fleet, setup);
+        Console.WriteLine("mods: " + string.Join(", ", list.Select(m => $"{m.Folder}={m.Enabled}{(m.Missing ? "(missing)" : "")}")));
+        Check(list[0].Folder == "SeaPowerTopo" && list[0].Enabled && list[0].IsLocal, "saved order first");
+        Check(list[1].Name == "Ship Pack" && !list[1].Enabled && list[1].SteamId == 111 && list[1].MadeFor == "0.8.5", "Workshop item: name, off, version");
+        Check(list[2].Missing, "unknown entry kept");
+        Check(list.Single(m => m.Folder == "222").Enabled == false, "new Workshop item starts off");
+        Check(!list.Any(m => m.Folder == "user" || m.Folder == "original" || m.Folder == "EntityScenes"), "game folders are not mods");
+        list[1].Enabled = true; list[0].Enabled = false;
+        var moved = list[0]; list[0] = list[1]; list[1] = moved;
+        ModList.Save(fleet, setup, list);
+        var lines = File.ReadAllLines(ini);
+        Check(lines.Contains("Mod1Directory=111,True,111") && lines.Contains("Mod2Directory=SeaPowerTopo,False,0") && lines.Contains("Mod3Directory=Gone,True,0"), "saved in the game's format");
+        Check(lines.Contains($"NumberOfModFiles={list.Count}") && lines.Count(l => l.StartsWith("NumberOfModFiles")) == 1, "count written once");
+        Check(lines.Contains("[A]") && lines.Contains("x=1") && lines.Contains("other=5") && lines.Contains("[B]") && lines.Contains("y=2"), "the rest of the file untouched");
+        Check(File.Exists(ini + ".before-flotilla") && File.ReadAllText(ini + ".before-flotilla").Contains("Mod2Directory=111,False,111"), "backup of the first state");
+        Check(ModList.Read(fleet, setup)[0].Folder == "111" && File.ReadAllText(cleanIni) == "[A]\r\nx=9\r\n", "reads back; the other copy unchanged");
+
+        var modSource = Path.Combine(box, "Downloads", "MyMod"); Put(modSource, "_info.ini", "[Language_en]\r\nName=My Mod\r\n"); Put(modSource, @"data\a.ini");
+        Check(ModList.Add(fleet, setup, modSource) == "MyMod" && File.Exists(Path.Combine(Game.Streaming(setup.Dir), @"MyMod\data\a.ini")), "add a folder to one copy");
+        Check(!Directory.Exists(Path.Combine(Game.Streaming(clean.Dir), "MyMod")) && !Directory.Exists(Path.Combine(sa, "MyMod")), "other copy and Steam install do not get it");
+        Throws(() => ModList.Add(fleet, setup, modSource), "same mod twice refused");
+        var zip = Path.Combine(box, "Downloads", "Zipped-1.0.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(modSource, zip);
+        Check(ModList.Add(fleet, clean, zip) == "Zipped-1.0" && File.Exists(Path.Combine(Game.Streaming(clean.Dir), @"Zipped-1.0\_info.ini")), "add a zip with the mod at its top");
+        var nested = Path.Combine(box, "Downloads", "nested.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(modSource, nested, System.IO.Compression.CompressionLevel.Fastest, true);
+        Check(ModList.Add(fleet, clean, nested) == "MyMod" && File.Exists(Path.Combine(Game.Streaming(clean.Dir), @"MyMod\data\a.ini")), "add a zip with the mod in a folder");
+        var bad = Path.Combine(box, "Downloads", "Plain"); Put(bad, "x.txt");
+        Throws(() => ModList.Add(fleet, setup, bad), "folder without _info.ini refused");
+        var reserved = Path.Combine(box, "Downloads", "original"); Put(reserved, "_info.ini");
+        Throws(() => ModList.Add(fleet, setup, reserved), "game folder name refused");
+        var mine = ModList.Read(fleet, setup).Single(m => m.Folder == "MyMod");
+        Throws(() => ModList.Remove(fleet, setup, ModList.Read(fleet, setup).Single(m => m.Folder == "222")), "Workshop folder never deleted");
+        Check(Directory.Exists(Path.Combine(workshop, "222")), "Workshop folder still there");
+        running = true;
+        Throws(() => ModList.Save(fleet, setup, list), "no save while the game runs");
+        Throws(() => ModList.Add(fleet, setup, bad), "no add while the game runs");
+        running = false;
+        ModList.Remove(fleet, setup, mine);
+        Check(!Directory.Exists(Path.Combine(Game.Streaming(setup.Dir), "MyMod")), "local mod removed");
+        Throws(() => ModList.Read(fleet, fleet.List()[0]), "Steam install not edited");
+        File.Delete(cleanIni);
+        Throws(() => ModList.Read(fleet, clean), "copy never started: asks to start it once");
+
         // Delete: a junction inside a copy is removed as a link, its target survives; the Steam install is never deleted
         var outside = Path.Combine(box, "outside"); Put(outside, "keep.txt");
         Junction(Path.Combine(clean.Dir, "link"), outside);

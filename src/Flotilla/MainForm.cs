@@ -15,7 +15,7 @@ namespace Flotilla
 
         readonly Fleet fleet;
         readonly ListView list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false, HideSelection = false };
-        readonly Button play = Btn("Play"), create = Btn("New copy..."), update = Btn("Update"), shortcut = Btn("Desktop shortcut"),
+        readonly Button play = Btn("Play"), create = Btn("New copy..."), mods = Btn("Mods..."), update = Btn("Update"), shortcut = Btn("Desktop shortcut"),
                         open = Btn("Open folder"), delete = Btn("Delete..."), cancel = Btn("Cancel");
         readonly Label status = new Label { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
         readonly Label fleetLabel = new Label { AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
@@ -33,7 +33,7 @@ namespace Flotilla
             Font = SystemFonts.MessageBoxFont;
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(940, 480);
-            MinimumSize = new Size(760, 380);
+            MinimumSize = new Size(760, 480);
             StartPosition = FormStartPosition.CenterScreen;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
 
@@ -48,10 +48,11 @@ namespace Flotilla
             list.DoubleClick += (s, e) => Play();
 
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 170, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10, 8, 10, 0), WrapContents = false };
-            buttons.Controls.AddRange(new Control[] { play, create, update, shortcut, open, delete });
+            buttons.Controls.AddRange(new Control[] { play, create, mods, update, shortcut, open, delete });
             play.Font = new Font(Font, FontStyle.Bold);
             play.Click += (s, e) => Play();
             create.Click += (s, e) => Create();
+            mods.Click += (s, e) => Mods();
             update.Click += (s, e) => Update_();
             shortcut.Click += (s, e) => Shortcut_();
             open.Click += (s, e) => { var i = Selected(); if (i != null) Process.Start("explorer.exe", $"\"{i.Dir}\"")?.Dispose(); };
@@ -188,6 +189,7 @@ namespace Flotilla
             play.Enabled = idle && install != null;
             create.Enabled = idle;
             update.Enabled = idle && copy;
+            mods.Enabled = idle && copy;
             shortcut.Enabled = idle && copy;
             delete.Enabled = idle && copy;
             open.Enabled = install != null;
@@ -247,6 +249,23 @@ namespace Flotilla
                     return $"\"{dialog.CopyName}\" is ready. Select it and press Play.";
                 });
             }
+        }
+
+        void Mods()
+        {
+            var install = Selected();
+            if (install == null || install.IsSteam) return;
+            try
+            {
+                using (var dialog = new ModsForm(fleet, install, ModList.Read(fleet, install)))
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        Refill();
+                        Say($"Mods of \"{install.Name}\" saved.");
+                        lastRunning = null;
+                    }
+            }
+            catch (FlotillaException e) { Warn(e.Message); }
         }
 
         void Update_()
