@@ -120,6 +120,15 @@ namespace Flotilla
             catch (FlotillaException e) { Warn(e.Message); }
             Refill();
             timer.Start();
+            var unfinished = fleet.Unfinished();
+            if (unfinished.Count > 0)
+                RunBusy("Removing a copy that was interrupted", (progress, token) =>
+                {
+                    foreach (var dir in unfinished) fleet.RemoveUnfinished(dir);
+                    return unfinished.Count == 1
+                        ? $"Removed the unfinished copy \"{Path.GetFileName(unfinished[0])}\". It was interrupted while being made."
+                        : $"Removed {unfinished.Count} unfinished copies. They were interrupted while being made.";
+                }, showBar: false);
         }
 
         bool Locate()

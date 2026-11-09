@@ -36,7 +36,9 @@ step 4 never happens (PC off, process killed), the next start of Flotilla or of 
 - **Copy of my setup**: every file except logs and caches (`Sea Power_Data\Logs`, `BepInEx\cache`, `BepInEx\LogOutput*`), plus the
   data folder without logs, crash reports, `temp` and `cache`.
 
-Links inside the Steam install are not followed. A cancelled or failed copy is removed again.
+Links inside the Steam install are not followed. A cancelled or failed copy is removed again. While a copy is being made it holds
+`flotilla.unfinished`; if the PC goes off or Flotilla is killed, the next start of Flotilla removes that folder. Only folders with
+that file count, so nothing else in the copies folder is ever touched.
 
 ## Update
 

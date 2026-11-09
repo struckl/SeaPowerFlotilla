@@ -65,6 +65,21 @@ static class Tests
         try { fleet.Create("Half", false, null, cts.Token); Check(false, "cancel throws"); }
         catch (OperationCanceledException) { Check(!Directory.Exists(Path.Combine(fleet.FleetDir, "Half")), "cancelled copy removed"); }
 
+        // Killed while copying: found and removed by its marker; a live copy, a finished copy and a foreign folder are left alone
+        Check(fleet.Unfinished().Count == 0 && !File.Exists(Path.Combine(setup.Dir, Fleet.UnfinishedMarker)), "finished copies carry no unfinished marker");
+        var killed = Path.Combine(fleet.FleetDir, "Killed");
+        Put(killed, Fleet.UnfinishedMarker, "999999"); Put(killed, @"Sea Power_Data\level0");
+        var live = Path.Combine(fleet.FleetDir, "Live");
+        Put(live, Fleet.UnfinishedMarker, System.Diagnostics.Process.GetCurrentProcess().Id.ToString());
+        var foreign = Path.Combine(fleet.FleetDir, "My own folder");
+        Put(foreign, "notes.txt");
+        Check(fleet.Unfinished().SequenceEqual(new[] { killed }), "only the killed copy counts as unfinished");
+        Check(!fleet.List().Any(i => i.Name == "Killed"), "unfinished copy not listed");
+        fleet.RemoveUnfinished(killed);
+        Check(!Directory.Exists(killed) && Directory.Exists(live) && File.Exists(Path.Combine(foreign, "notes.txt")), "unfinished copy removed, others kept");
+        Check(fleet.CheckName("Killed") == null, "its name is free again");
+        Copier.DeleteTree(live); Copier.DeleteTree(foreign);
+
         // Play a copy: junction during the run, Steam data untouched, copy data written
         fleet.RunGame = install =>
         {

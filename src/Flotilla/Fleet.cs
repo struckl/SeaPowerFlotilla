@@ -24,6 +24,8 @@ namespace Flotilla
     public sealed class Fleet
     {
         public const string Marker = "flotilla.ini";
+        /// <summary>Lies in a copy while it is being made and holds the id of the Flotilla process making it.</summary>
+        public const string UnfinishedMarker = "flotilla.unfinished";
         public const string DataFolder = "UserData";
         public const string KindClean = "clean", KindSetup = "setup";
 
@@ -128,6 +130,8 @@ namespace Flotilla
             Log($"create {(clean ? "clean" : "setup")} copy '{name}' in {dir}: {plan.Files.Count} files, {Gb(plan.Bytes)}");
             try
             {
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, UnfinishedMarker), Process.GetCurrentProcess().Id.ToString());
                 Copier.Copy(dir, plan, progress, cancel);
                 Copier.Copy(Path.Combine(dir, DataFolder), data, null, cancel);
                 File.WriteAllText(Path.Combine(dir, "steam_appid.txt"), Game.AppId.ToString());
@@ -138,6 +142,7 @@ namespace Flotilla
                     $"created={DateTime.Now:yyyy-MM-dd HH:mm}",
                     $"from={Game.BuildOf(SteamGame)}",
                 });
+                File.Delete(Path.Combine(dir, UnfinishedMarker));
             }
             catch (Exception)
             {
@@ -145,6 +150,36 @@ namespace Flotilla
                 throw;
             }
             return Find(name);
+        }
+
+        /// <summary>
+        /// Folders Flotilla started copying and never finished (PC turned off, Flotilla killed). Only folders with Flotilla's
+        /// own marker count, and none that a running Flotilla is still filling.
+        /// </summary>
+        public List<string> Unfinished()
+        {
+            if (FleetDir == null || !Directory.Exists(FleetDir)) return new List<string>();
+            return Directory.GetDirectories(FleetDir)
+                .Where(d => File.Exists(Path.Combine(d, UnfinishedMarker)) && !File.Exists(Path.Combine(d, Marker)) && !BeingMade(d))
+                .ToList();
+        }
+
+        static bool BeingMade(string dir)
+        {
+            if (!int.TryParse(File.ReadAllText(Path.Combine(dir, UnfinishedMarker)).Trim(), out var id)) return false;
+            try
+            {
+                using (var maker = Process.GetProcessById(id))
+                using (var self = Process.GetCurrentProcess())
+                    return maker.ProcessName == self.ProcessName;
+            }
+            catch (ArgumentException) { return false; }  // no process with that id any more
+        }
+
+        public void RemoveUnfinished(string dir)
+        {
+            Log($"remove unfinished copy {dir}");
+            Copier.DeleteTree(dir);
         }
 
         /// <summary>After a Steam update: the copy's game files become the Steam install's; its mods, missions and data stay.</summary>

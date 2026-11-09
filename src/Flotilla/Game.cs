@@ -70,7 +70,7 @@ namespace Flotilla
         public static readonly HashSet<string> LoaderFiles = new HashSet<string>(C) { "winhttp.dll", "doorstop_config.ini", ".doorstop_version" };
         public static readonly HashSet<string> GameStreaming = new HashSet<string>(C) { "EntityScenes", "original" };
         public static readonly HashSet<string> OwnDirs = new HashSet<string>(C) { Fleet.DataFolder };
-        public static readonly HashSet<string> OwnFiles = new HashSet<string>(C) { "steam_appid.txt", Fleet.Marker };
+        public static readonly HashSet<string> OwnFiles = new HashSet<string>(C) { "steam_appid.txt", Fleet.Marker, Fleet.UnfinishedMarker };
         static readonly HashSet<string> SkipDataDirs = new HashSet<string>(C) { "CrashDiagnostics", "Sentry", ".sentry-native", "temp", "cache" };
 
         /// <summary>Files Steam installs: what a clean copy gets and what Update refreshes.</summary>
