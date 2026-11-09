@@ -29,7 +29,7 @@ namespace Flotilla
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
 
-            list.Columns.Add("Mod (ticked = on, top loads first)", 330);
+            list.Columns.Add("Mod (ticked = on, in load order)", 330);
             list.Columns.Add("Where", 130);
             list.Columns.Add("Made for", 80);
             list.Columns.Add("Folder", 170);
