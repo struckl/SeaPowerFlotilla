@@ -40,6 +40,14 @@ Links inside the Steam install are not followed. A cancelled or failed copy is r
 `flotilla.unfinished`; if the PC goes off or Flotilla is killed, the next start of Flotilla removes that folder. Only folders with
 that file count, so nothing else in the copies folder is ever touched.
 
+## Mods of a copy
+
+The **Mods...** window lists the copy's own StreamingAssets folders and the Workshop downloads. Saving rewrites only the mod lines of
+`[LoadOrder]` in `<copy>\UserData\usersettings.ini` (`ModNDirectory=folder,enabled,steamId`, the game's own format) and keeps the first
+version as `usersettings.ini.before-flotilla`. Entries for mods not on the PC right now are kept. A copy must have been started once,
+because the game writes that file. Adding copies a mod into this copy's StreamingAssets only. Workshop folders are never deleted and the
+Steam install is never edited: use the game's own mod menu there.
+
 ## Update
 
 Update compares the *game files* (the clean set above) of the Steam install and the copy by size and modified time, copies what

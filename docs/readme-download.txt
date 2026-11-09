@@ -13,6 +13,7 @@ USE
   New copy...       Clean (only the game's files, no mods, fresh settings) or a copy of your current setup.
                     About 19 GB each, in "Sea Power Flotilla" next to your Steam library (Change... to move it).
   Play              Starts the selected install. Steam must be running. One Sea Power at a time.
+  Mods...           For one copy: mods on/off, their order, add a mod folder or .zip to this copy only.
   Update            After Steam updated the game: brings a copy's game files up to date, keeps its mods and saves.
   Desktop shortcut  "Sea Power (name)" on the desktop, starts that copy directly.
   Delete...         Removes a copy for good. The Steam install is never touched.
