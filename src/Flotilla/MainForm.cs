@@ -15,7 +15,7 @@ namespace Flotilla
 
         readonly Fleet fleet;
         readonly ListView list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false, HideSelection = false };
-        readonly Button play = Btn("Play"), create = Btn("New copy..."), mods = Btn("Mods..."), update = Btn("Update"), shortcut = Btn("Desktop shortcut"),
+        readonly Button play = Btn("Play"), create = Btn("New copy..."), mods = Btn("Mods..."), rename = Btn("Rename..."), update = Btn("Update"), shortcut = Btn("Desktop shortcut"),
                         open = Btn("Open folder"), delete = Btn("Delete..."), cancel = Btn("Cancel");
         readonly Label status = new Label { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
         readonly Label fleetLabel = new Label { AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
@@ -32,8 +32,8 @@ namespace Flotilla
             Text = Program.Title;
             Font = SystemFonts.MessageBoxFont;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(940, 480);
-            MinimumSize = new Size(760, 480);
+            ClientSize = new Size(940, 520);
+            MinimumSize = new Size(760, 540);
             StartPosition = FormStartPosition.CenterScreen;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
 
@@ -48,11 +48,12 @@ namespace Flotilla
             list.DoubleClick += (s, e) => Play();
 
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 170, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10, 8, 10, 0), WrapContents = false };
-            buttons.Controls.AddRange(new Control[] { play, create, mods, update, shortcut, open, delete });
+            buttons.Controls.AddRange(new Control[] { play, create, mods, rename, update, shortcut, open, delete });
             play.Font = new Font(Font, FontStyle.Bold);
             play.Click += (s, e) => Play();
             create.Click += (s, e) => Create();
             mods.Click += (s, e) => Mods();
+            rename.Click += (s, e) => Rename();
             update.Click += (s, e) => Update_();
             shortcut.Click += (s, e) => Shortcut_();
             open.Click += (s, e) => { var i = Selected(); if (i != null) Process.Start("explorer.exe", $"\"{i.Dir}\"")?.Dispose(); };
@@ -190,6 +191,7 @@ namespace Flotilla
             create.Enabled = idle;
             update.Enabled = idle && copy;
             mods.Enabled = idle && copy;
+            rename.Enabled = idle && copy;
             shortcut.Enabled = idle && copy;
             delete.Enabled = idle && copy;
             open.Enabled = install != null;
@@ -266,6 +268,41 @@ namespace Flotilla
                     }
             }
             catch (FlotillaException e) { Warn(e.Message); }
+        }
+
+        void Rename()
+        {
+            var install = Selected();
+            if (install == null || install.IsSteam) return;
+            var name = AskName(install.Name);
+            if (name == null || name == install.Name) return;
+            try
+            {
+                var renamed = fleet.Rename(install, name);
+                try { Shortcut.Renamed(install.Name, renamed); }
+                catch (Exception e) { Warn("Renamed, but the desktop shortcut could not follow: " + e.Message); }
+                Refill();
+                Say($"\"{install.Name}\" is now \"{renamed.Name}\".");
+                lastRunning = null;
+            }
+            catch (FlotillaException e) { Warn(e.Message); }
+            catch (IOException e) { Warn("Could not rename it. Is one of its files or folders open somewhere?\n\n" + e.Message); }
+        }
+
+        string AskName(string current)
+        {
+            using (var form = new Form { Text = "Rename - " + Program.Title, Font = Font, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false,
+                                         StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(380, 112), ShowInTaskbar = false })
+            {
+                var label = new Label { Text = "A name that says what this copy is for:", AutoSize = true, Location = new Point(12, 12) };
+                var box = new TextBox { Text = current, Location = new Point(14, 36), Width = 352 };
+                var ok = new Button { Text = "Rename", DialogResult = DialogResult.OK, Location = new Point(180, 72), Width = 90 };
+                var no = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(276, 72), Width = 90 };
+                form.Controls.AddRange(new Control[] { label, box, ok, no });
+                form.AcceptButton = ok;
+                form.CancelButton = no;
+                return form.ShowDialog(this) == DialogResult.OK ? box.Text.Trim() : null;
+            }
         }
 
         void Update_()

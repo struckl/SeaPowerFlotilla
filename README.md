@@ -3,7 +3,7 @@
 *R.A.T.S. – Reconnaissance, Acoustics, Terrain & Signals*
 
 Several Sea Power installs on one PC, side by side, each with its own mods, settings and saves. Keep one bone-clean
-for bug reports, one loaded with a big Anchor Chain mod set, one for trying things out, and keep your Steam install as it is.
+for bug reports, one loaded with a big mod set, one for trying things out, and keep your Steam install as it is.
 
 ![Flotilla](docs/flotilla.png)
 
@@ -22,6 +22,7 @@ It is not a game mod: it does not go into the game folder and is not on the Stea
 | **New copy...** | **Clean**: only the game's own files as Steam installs them: no mod loader, no local mods, no missions, fresh settings with no mods enabled. **Copy of my setup**: everything of your Steam install: BepInEx, local mods, missions, settings, the enabled mods with their load order, saves. About 19 GB either way. |
 | **Play** | Starts the selected install (Steam must be running). Flotilla can be closed while you play. |
 | **Mods...** | For one copy: switch mods on or off, set their order, add a mod (a folder or a .zip) to this copy only, remove it again. Shows which game version each mod was made for. A copy has to be started once first. |
+| **Rename...** | Gives a copy a name that says what it is for. A desktop shortcut it already has follows the new name. |
 | **Update** | After Steam updated the game: brings the copy's game files up to date. Its mod loader, mods, missions, settings and saves stay. |
 | **Desktop shortcut** | `Sea Power (<name>)` on the desktop, starts that copy directly. |
 | **Delete...** | Removes a copy for good. The Steam install is never deleted or changed. |

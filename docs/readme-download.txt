@@ -2,7 +2,7 @@ R.A.T.S. Flotilla
 Reconnaissance, Acoustics, Terrain & Signals
 
 Several Sea Power installs on one PC, each with its own mods, settings and saves.
-For example: a clean one for bug reports, one with a big Anchor Chain mod set, one for trying things out.
+For example: a clean one for bug reports, one with a big mod set, one for trying things out.
 
 START
   Put SeaPowerFlotilla.exe in a folder that stays (desktop shortcuts point to it) and start it.
@@ -14,6 +14,7 @@ USE
                     About 19 GB each, in "Sea Power Flotilla" next to your Steam library (Change... to move it).
   Play              Starts the selected install. Steam must be running. One Sea Power at a time.
   Mods...           For one copy: mods on/off, their order, add a mod folder or .zip to this copy only.
+  Rename...         A name that says what the copy is for.
   Update            After Steam updated the game: brings a copy's game files up to date, keeps its mods and saves.
   Desktop shortcut  "Sea Power (name)" on the desktop, starts that copy directly.
   Delete...         Removes a copy for good. The Steam install is never touched.

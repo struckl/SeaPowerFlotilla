@@ -75,7 +75,7 @@ namespace Flotilla
             name = name?.Trim() ?? "";
             if (name.Length == 0) return "Give the copy a name.";
             if (name.Length > 40) return "Keep the name under 40 characters.";
-            if (!Regex.IsMatch(name, @"^[A-Za-z0-9][A-Za-z0-9 _\-]*$")) return "Use letters, digits, spaces, - and _ only.";
+            if (!Regex.IsMatch(name, @"^[\p{L}\p{N}][\p{L}\p{N} _\-+()&]*$")) return "Use letters, digits, spaces and - _ + ( ) & only.";
             if (string.Equals(name, "Steam", StringComparison.OrdinalIgnoreCase)) return "\"Steam\" is the Steam install itself.";
             if (FleetDir != null && Directory.Exists(Path.Combine(FleetDir, name))) return $"There is already a folder \"{name}\" in {FleetDir}.";
             return CheckFleetDir(FleetDir);
@@ -191,6 +191,20 @@ namespace Flotilla
             var result = Copier.Sync(SteamGame, install.Dir, Layout.IsGame, progress, cancel);
             Log($"update '{install.Name}': {result.Copied} files copied, {result.Deleted} removed");
             return result;
+        }
+
+        /// <summary>Gives a copy a new name, which is also the name of its folder.</summary>
+        public Install Rename(Install install, string name)
+        {
+            if (install.IsSteam) throw new FlotillaException("The Steam install keeps its name.");
+            var problem = CheckName(name);
+            if (problem != null) throw new FlotillaException(problem);
+            if (GameRunning()) throw new FlotillaException("Sea Power is running. Close it first.");
+            EnsureNormal();
+            name = name.Trim();
+            Log($"rename '{install.Name}' to '{name}'");
+            Directory.Move(install.Dir, Path.Combine(FleetDir, name));
+            return Find(name);
         }
 
         public void Delete(Install install)

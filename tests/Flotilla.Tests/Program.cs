@@ -197,6 +197,19 @@ static class Tests
         File.Delete(cleanIni);
         Throws(() => ModList.Read(fleet, clean), "copy never started: asks to start it once");
 
+        // Rename: the folder follows, data stays, other names and states refused
+        var renamed = fleet.Rename(setup, "Pacific (DCM + 80 mods)");
+        Check(renamed.Name == "Pacific (DCM + 80 mods)" && Directory.Exists(renamed.Dir) && !Directory.Exists(setup.Dir), "renamed with + and brackets");
+        Check(File.Exists(Path.Combine(renamed.DataDir, "usersettings.ini")) && renamed.Kind == setup.Kind, "data and kind kept");
+        Check(fleet.CheckName("Übung") == null && fleet.CheckName("Тест") == null, "non-English letters allowed");
+        Throws(() => fleet.Rename(renamed, "Clean"), "name in use refused");
+        Throws(() => fleet.Rename(renamed, "a\\b"), "bad name refused");
+        Throws(() => fleet.Rename(fleet.List()[0], "New"), "Steam install keeps its name");
+        running = true;
+        Throws(() => fleet.Rename(renamed, "Later"), "no rename while the game runs");
+        running = false;
+        fleet.Rename(renamed, setup.Name);
+
         // Delete: a junction inside a copy is removed as a link, its target survives; the Steam install is never deleted
         var outside = Path.Combine(box, "outside"); Put(outside, "keep.txt");
         Junction(Path.Combine(clean.Dir, "link"), outside);
