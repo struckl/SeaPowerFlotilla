@@ -17,6 +17,8 @@ Or subscribe on the Steam Workshop and start `SeaPowerFlotilla.exe` once from th
 
 It is not a game mod: its entry in the game's Mods menu does nothing and can stay off.
 
+Step by step on Steam: the [Flotilla guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3836683383). On the Workshop: [R.A.T.S. Flotilla](https://steamcommunity.com/sharedfiles/filedetails/?id=3836624723).
+
 ## Use
 
 | Button | What it does |
