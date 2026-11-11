@@ -2,6 +2,8 @@
 
 *R.A.T.S. – Reconnaissance, Acoustics, Terrain & Signals*
 
+**Bugs, ideas, questions:** [R.A.T.S. feedback board](https://hub.sewerlabs.dev/s/flotilla)
+
 Several Sea Power installs on one PC, side by side, each with its own mods, settings and saves. Keep one bone-clean
 for bug reports, one loaded with a big mod set, one for trying things out, and keep your Steam install as it is.
 
