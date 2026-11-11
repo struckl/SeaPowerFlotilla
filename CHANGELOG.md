@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 – 2026-11-11
+
+Each copy can have its own version of a Workshop mod: **Keep in this copy** in the Mods window copies the mod into that copy and
+switches the Workshop entry off there, so Steam updates and unsubscribing no longer change it. The list shows when it was kept and
+when the Workshop has something newer; **Use Workshop again** goes back. Workshop item declares game 0.8.7 up to 0.10.0, so games on
+0.9.0 download Flotilla updates again. Tested offline (tests/Flotilla.Tests); the window rendered off-screen, not clicked through in
+the game.
+
 ## 0.1.0 – 2026-11-09
 
 First version: clean copies and copies of the setup, Play with a per-copy data folder, Update after game updates,

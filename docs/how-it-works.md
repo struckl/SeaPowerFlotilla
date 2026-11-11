@@ -45,7 +45,14 @@ that file count, so nothing else in the copies folder is ever touched.
 The **Mods...** window lists the copy's own StreamingAssets folders and the Workshop downloads. Saving rewrites only the mod lines of
 `[LoadOrder]` in `<copy>\UserData\usersettings.ini` (`ModNDirectory=folder,enabled,steamId`, the game's own format) and keeps the first
 version as `usersettings.ini.before-flotilla`. Entries for mods not on the PC right now are kept. A copy must have been started once,
-because the game writes that file. Adding copies a mod into this copy's StreamingAssets only. Workshop folders are never deleted and the
+because the game writes that file. Adding copies a mod into this copy's StreamingAssets only.
+
+**Keep in this copy** copies a Workshop item's folder into the copy's StreamingAssets as `<name> (kept)`, writes `flotilla-kept.txt`
+into it (`WorkshopId`, `Name`, `FilesFrom` = the newest file time of the Workshop folder, `KeptOn`) and switches the Workshop entry
+off in this copy; the kept folder takes its place in the load order and is saved like any local mod (`<name> (kept),True,0`). The
+Mods window reads the marker back and compares `FilesFrom` with the Workshop folder to show "Workshop newer". **Use Workshop again**
+deletes the kept folder and puts the Workshop entry back at its place, with the kept folder's on/off; it needs the item to be
+subscribed. The game's own subscription list cannot be split per copy: it asks Steam for the account's list at every start. Workshop folders are never deleted and the
 Steam install is never edited: use the game's own mod menu there.
 
 ## Update

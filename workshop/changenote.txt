@@ -1,1 +1,1 @@
-First release: clean copies and copies of your setup, each with its own mods, settings and saves.
+0.2.0: each copy can keep its own version of a Workshop mod. In Mods..., select a Workshop mod and press Keep in this copy: Steam updates and unsubscribing no longer change it in that copy, the other copies still update. Use Workshop again goes back. Also fits game 0.9.0, so Flotilla updates reach you again.

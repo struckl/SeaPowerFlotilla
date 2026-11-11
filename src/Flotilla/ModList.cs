@@ -15,6 +15,19 @@ namespace Flotilla
         public bool Enabled, IsLocal;
         /// <summary>In the saved list but not on this PC right now (say, an unsubscribed item). Kept, not shown.</summary>
         public bool Missing;
+        /// <summary>A local folder that is this copy's own copy of a Workshop item ("Keep in this copy"): the item's id, else 0.</summary>
+        public ulong KeptFrom;
+        /// <summary>When the kept files were downloaded by Steam (their newest file).</summary>
+        public DateTime KeptAt;
+        /// <summary>Steam has a newer download of the item than the kept copy.</summary>
+        public bool WorkshopNewer;
+
+        public bool IsKept => KeptFrom != 0;
+
+        public string Where =>
+            !IsLocal ? "Workshop"
+            : !IsKept ? "This copy only"
+            : $"Kept, {KeptAt:yyyy-MM-dd}" + (WorkshopNewer ? " (Workshop newer)" : "");
     }
 
     /// <summary>
@@ -66,12 +79,45 @@ namespace Flotilla
                 foreach (var dir in Directory.GetDirectories(workshop).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
                     if (ulong.TryParse(Path.GetFileName(dir), out var id) && !File.Exists(Path.Combine(dir, AppHome.ExeName)))  // Flotilla's own item is no mod
                         mods.Add(Describe(dir, id, false));
+            foreach (var kept in mods.Where(m => m.IsKept))
+            {
+                var item = mods.FirstOrDefault(m => !m.IsLocal && m.SteamId == kept.KeptFrom);
+                kept.WorkshopNewer = item != null && Newest(item.Dir) > kept.KeptAt.AddSeconds(2);
+            }
             return mods;
+        }
+
+        /// <summary>Written into a kept folder: which Workshop item it came from and how new its files were.</summary>
+        public const string KeptMarker = "flotilla-kept.txt";
+
+        /// <summary>The newest file time in a folder: when Steam last downloaded the item.</summary>
+        static DateTime Newest(string dir)
+        {
+            var times = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+                .Where(f => !Layout.Same(Path.GetFileName(f), KeptMarker)).Select(File.GetLastWriteTimeUtc);
+            return times.DefaultIfEmpty(Directory.GetLastWriteTimeUtc(dir)).Max();
+        }
+
+        static void ReadMarker(ModEntry mod)
+        {
+            var marker = Path.Combine(mod.Dir, KeptMarker);
+            if (!File.Exists(marker)) return;
+            foreach (var line in File.ReadAllLines(marker))
+            {
+                var parts = line.Split(new[] { '=' }, 2);
+                if (parts.Length != 2) continue;
+                var key = parts[0].Trim();
+                var value = parts[1].Trim();
+                if (Layout.Same(key, "WorkshopId")) ulong.TryParse(value, out mod.KeptFrom);
+                else if (Layout.Same(key, "FilesFrom") && DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+                             System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var at)) mod.KeptAt = at;
+            }
         }
 
         static ModEntry Describe(string dir, ulong id, bool local)
         {
             var mod = new ModEntry { Folder = Path.GetFileName(dir), Dir = dir, SteamId = id, IsLocal = local, Name = Path.GetFileName(dir), MadeFor = "" };
+            if (local) ReadMarker(mod);
             var info = Path.Combine(dir, "_info.ini");
             if (!File.Exists(info)) return mod;
             var text = File.ReadAllText(info);
@@ -166,6 +212,32 @@ namespace Flotilla
             Copier.Copy(target, Copier.Scan(source, (rel, isDir) => true), null, default);
             fleet.Log($"added mod '{name}' to '{install.Name}'");
             return name;
+        }
+
+        /// <summary>
+        /// "Keep in this copy": copies a Workshop item's files into this copy as a local mod, so Steam updates and unsubscribing no
+        /// longer change it here. Returns the new folder name; the caller switches the Workshop entry off in this copy.
+        /// </summary>
+        public static string Keep(Fleet fleet, Install install, ModEntry item)
+        {
+            NeedClosed(fleet, install);
+            if (item.IsLocal || item.SteamId == 0) throw new FlotillaException("Only a Workshop mod can be kept in a copy.");
+            if (!Directory.Exists(item.Dir)) throw new FlotillaException($"Steam has no files of \"{item.Name}\" on this PC right now.");
+            var name = new string(item.Name.Where(c => !Path.GetInvalidFileNameChars().Contains(c) && c != ',').ToArray()).Trim().TrimEnd('.');
+            if (name.Length == 0 || NotMods.Contains(name)) name = item.SteamId.ToString();
+            name += " (kept)";
+            var filesFrom = Newest(item.Dir);
+            var folder = CopyIn(fleet, install, item.Dir, name);
+            File.WriteAllLines(Path.Combine(Game.Streaming(install.Dir), folder, KeptMarker), new[]
+            {
+                "; Written by R.A.T.S. Flotilla: this copy's own copy of a Workshop item. Steam updates do not change it.",
+                $"WorkshopId={item.SteamId}",
+                $"Name={item.Name}",
+                $"FilesFrom={filesFrom.ToString("o", System.Globalization.CultureInfo.InvariantCulture)}",
+                $"KeptOn={DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture)}",
+            }, new UTF8Encoding(false));
+            fleet.Log($"kept Workshop item {item.SteamId} in '{install.Name}' as '{folder}'");
+            return folder;
         }
 
         /// <summary>Deletes a mod folder of this copy. Workshop items are never deleted: they belong to every install.</summary>

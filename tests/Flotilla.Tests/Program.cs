@@ -193,6 +193,34 @@ static class Tests
         running = false;
         ModList.Remove(fleet, setup, mine);
         Check(!Directory.Exists(Path.Combine(Game.Streaming(setup.Dir), "MyMod")), "local mod removed");
+
+        // Keep in this copy: the Workshop item's files become this copy's own, marked with where they came from
+        Put(workshop, @"111\data\ship.ini", "v1");
+        var oldTime = DateTime.UtcNow.AddDays(-3);
+        foreach (var f in Directory.GetFiles(Path.Combine(workshop, "111"), "*", SearchOption.AllDirectories)) File.SetLastWriteTimeUtc(f, oldTime);
+        var shipPack = ModList.Read(fleet, setup).Single(m => m.SteamId == 111 && !m.IsLocal);
+        Check(ModList.Keep(fleet, setup, shipPack) == "Ship Pack (kept)", "keep: folder named after the mod");
+        var keptDir = Path.Combine(Game.Streaming(setup.Dir), "Ship Pack (kept)");
+        Check(File.ReadAllText(Path.Combine(keptDir, @"data\ship.ini")) == "v1" && File.Exists(Path.Combine(keptDir, ModList.KeptMarker)), "keep: files and marker copied");
+        Check(!Directory.Exists(Path.Combine(Game.Streaming(clean.Dir), "Ship Pack (kept)")) && Directory.Exists(Path.Combine(workshop, "111")), "keep: other copy and Workshop folder untouched");
+        var keptEntry = ModList.Read(fleet, setup).Single(m => m.Folder == "Ship Pack (kept)");
+        Check(keptEntry.IsLocal && keptEntry.IsKept && keptEntry.KeptFrom == 111 && keptEntry.SteamId == 0 && keptEntry.Name == "Ship Pack", "keep: listed as a kept local mod");
+        Check(Math.Abs((keptEntry.KeptAt - oldTime).TotalSeconds) < 2 && !keptEntry.WorkshopNewer && keptEntry.Where.StartsWith("Kept, "), "keep: dated by the Workshop files, not newer yet");
+        Throws(() => ModList.Keep(fleet, setup, shipPack), "keep twice refused");
+        Throws(() => ModList.Keep(fleet, setup, keptEntry), "a local mod cannot be kept");
+        File.WriteAllText(Path.Combine(workshop, @"111\data\ship.ini"), "v2");  // Steam updates the item
+        keptEntry = ModList.Read(fleet, setup).Single(m => m.Folder == "Ship Pack (kept)");
+        Check(keptEntry.WorkshopNewer && keptEntry.Where.EndsWith("(Workshop newer)"), "keep: a newer Workshop download is shown");
+        Check(File.ReadAllText(Path.Combine(keptDir, @"data\ship.ini")) == "v1", "keep: the Steam update does not reach the kept copy");
+        var keptList = ModList.Read(fleet, setup);
+        keptList.Single(m => m.Folder == "Ship Pack (kept)").Enabled = true;
+        ModList.Save(fleet, setup, keptList);
+        Check(File.ReadAllLines(ini).Contains("Mod" + (keptList.FindIndex(m => m.Folder == "Ship Pack (kept)") + 1) + "Directory=Ship Pack (kept),True,0"), "keep: saved as a local mod in the game's format");
+        running = true;
+        Throws(() => ModList.Keep(fleet, setup, shipPack), "no keep while the game runs");
+        running = false;
+        ModList.Remove(fleet, setup, keptEntry);
+        Check(!Directory.Exists(keptDir) && Directory.Exists(Path.Combine(workshop, "111")), "use Workshop again: kept copy gone, Workshop folder stays");
         Throws(() => ModList.Read(fleet, fleet.List()[0]), "Steam install not edited");
         File.Delete(cleanIni);
         Throws(() => ModList.Read(fleet, clean), "copy never started: asks to start it once");
