@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 – 2026-11-11
+
+Mods follow the game: after **Update** moves a copy to a new game version, Flotilla checks its mods the way the game does and offers
+the steps: refresh a kept mod whose Workshop version fits, switch off a mod with no fitting version (in that copy only). Every step can
+be unticked. **Refresh from Workshop** updates a kept mod on purpose; **Check game version...** runs the check any time. The Mods list
+shows each mod's version range. Tested offline (tests/Flotilla.Tests; the version rule also compared with the workspace's on every
+Workshop mod on the test PC); the windows rendered off-screen, not clicked through in the game.
+
 ## 0.2.0 – 2026-11-11
 
 Each copy can have its own version of a Workshop mod: **Keep in this copy** in the Mods window copies the mod into that copy and

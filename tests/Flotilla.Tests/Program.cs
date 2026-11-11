@@ -219,6 +219,39 @@ static class Tests
         running = true;
         Throws(() => ModList.Keep(fleet, setup, shipPack), "no keep while the game runs");
         running = false;
+        // The game's version rule, the Refresh of a kept mod and the check after a game update
+        var approx = Compat.Section("[Compatibility]\r\n;ApproximateVersion=1.0.0\r\nApproximateVersion=0.8.5\r\n");
+        var range = Compat.Section("[Language_en]\r\nName=x\r\n[Compatibility]\r\nGreaterThanEqualToVersion=0.8.7\r\nLessThanVersion=0.10.0\r\n");
+        Check(Compat.Matches(approx, "0.8.7") && !Compat.Matches(approx, "0.9.0") && !Compat.Matches(approx, "0.8.4"), "rule: ApproximateVersion = same minor, patch up");
+        Check(Compat.Matches(range, "0.9.0") && Compat.Matches(range, "0.8.7") && !Compat.Matches(range, "0.10.0") && !Compat.Matches(range, "0.8.6"), "rule: range");
+        Check(Compat.Matches(Compat.Section("[Compatibility]\r\nExactVersion=0.9.0\r\n"), "0.9.0") && !Compat.Matches(Compat.Section("[Compatibility]\r\nExactVersion=0.9.0\r\n"), "0.9.1"), "rule: exact");
+        Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.8.0\r\nExcludeVersions=0.8.5, 0.9.0\r\n"), "0.9.0"), "rule: excluded version");
+        Check(Compat.Matches(new Dictionary<string, string>(), "0.9.0") && Compat.Describe(range) == "0.8.7 up to 0.10.0" && Compat.Describe(approx) == "0.8.5", "rule: no declaration fits; short words");
+        Check(Game.VersionOf(setup.Dir) == "0.8.8", "game version of a copy from its changelog");
+
+        File.WriteAllText(Path.Combine(workshop, @"111\_info.ini"), "[Language_en]\r\nName=Ship Pack\r\n[Compatibility]\r\nGreaterThanEqualToVersion=0.9.0\r\n");  // the author's 0.9 version
+        Put(Game.Streaming(setup.Dir), @"OldLocal\_info.ini", "[Language_en]\r\nName=Old Local\r\n[Compatibility]\r\nApproximateVersion=0.8.5\r\n");
+        var checkList = ModList.Read(fleet, setup);
+        foreach (var m in checkList) m.Enabled = m.Folder == "Ship Pack (kept)" || m.Folder == "222" || m.Folder == "OldLocal";
+        var rows = ModList.Check(fleet, checkList, "0.9.0");
+        Check(rows.Count == 3, "check: only the mods that are on");
+        var keptRow = rows.Single(r => r.Mod.Folder == "Ship Pack (kept)");
+        Check(!keptRow.Fits && keptRow.Step == ModList.Step.Refresh && keptRow.WorkshopFor == "0.9.0", "check: kept mod that does not fit, Workshop fits: refresh");
+        Check(rows.Single(r => r.Mod.Folder == "222").Step == ModList.Step.None, "check: a fitting mod is left alone");
+        Check(rows.Single(r => r.Mod.Folder == "OldLocal").Step == ModList.Step.SwitchOff, "check: nothing fits: switch off");
+        Check(ModList.Check(fleet, checkList, "0.8.7").Single(r => r.Mod.Folder == "Ship Pack (kept)").Step == ModList.Step.None, "check: the kept mod fits the old game, stays frozen");
+        ModList.Apply(fleet, setup, rows.Where(r => r.Step != ModList.Step.None));
+        Check(File.ReadAllText(Path.Combine(keptDir, @"data\ship.ini")) == "v2" && keptRow.Mod.IsKept && keptRow.Mod.Fits("0.9.0") && !keptRow.Mod.WorkshopNewer, "refresh: kept copy now has the Workshop files, still kept");
+        Check(!Directory.Exists(keptDir + ".flotilla-new") && !Directory.Exists(keptDir + ".flotilla-old"), "refresh: no leftovers");
+        Check(!checkList.Single(m => m.Folder == "OldLocal").Enabled && checkList.Single(m => m.Folder == "222").Enabled, "apply: only the ticked mod switched off");
+        File.WriteAllText(Path.Combine(workshop, @"111\data\ship.ini"), "v3");
+        Check(File.ReadAllText(Path.Combine(keptDir, @"data\ship.ini")) == "v2", "refresh: later Steam updates still do not reach it");
+        running = true;
+        Throws(() => ModList.Refresh(fleet, setup, keptRow.Mod), "no refresh while the game runs");
+        running = false;
+        Throws(() => ModList.Refresh(fleet, setup, checkList.Single(m => m.Folder == "222")), "a Workshop mod cannot be refreshed");
+        Copier.DeleteTree(Path.Combine(Game.Streaming(setup.Dir), "OldLocal"));
+
         ModList.Remove(fleet, setup, keptEntry);
         Check(!Directory.Exists(keptDir) && Directory.Exists(Path.Combine(workshop, "111")), "use Workshop again: kept copy gone, Workshop folder stays");
         Throws(() => ModList.Read(fleet, fleet.List()[0]), "Steam install not edited");

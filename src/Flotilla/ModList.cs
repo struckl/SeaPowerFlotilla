@@ -21,6 +21,10 @@ namespace Flotilla
         public DateTime KeptAt;
         /// <summary>Steam has a newer download of the item than the kept copy.</summary>
         public bool WorkshopNewer;
+        /// <summary>The [Compatibility] section of its _info.ini: which game versions it says it fits.</summary>
+        public Dictionary<string, string> Decl = new Dictionary<string, string>();
+
+        public bool Fits(string gameVersion) => Compat.Matches(Decl, gameVersion);
 
         public bool IsKept => KeptFrom != 0;
 
@@ -121,10 +125,10 @@ namespace Flotilla
             var info = Path.Combine(dir, "_info.ini");
             if (!File.Exists(info)) return mod;
             var text = File.ReadAllText(info);
+            mod.Decl = Compat.Section(text);
+            mod.MadeFor = Compat.Describe(mod.Decl);
             var name = Regex.Match(text, @"\[Language_en\][^\[]*?^Name=(.+?)\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
             if (name.Success) mod.Name = name.Groups[1].Value;
-            var version = Regex.Match(text, @"^ApproximateVersion=(\S+)", RegexOptions.Multiline | RegexOptions.IgnoreCase);
-            if (version.Success) mod.MadeFor = version.Groups[1].Value;
             return mod;
         }
 
@@ -228,7 +232,13 @@ namespace Flotilla
             name += " (kept)";
             var filesFrom = Newest(item.Dir);
             var folder = CopyIn(fleet, install, item.Dir, name);
-            File.WriteAllLines(Path.Combine(Game.Streaming(install.Dir), folder, KeptMarker), new[]
+            WriteMarker(Path.Combine(Game.Streaming(install.Dir), folder), item, filesFrom);
+            fleet.Log($"kept Workshop item {item.SteamId} in '{install.Name}' as '{folder}'");
+            return folder;
+        }
+
+        static void WriteMarker(string dir, ModEntry item, DateTime filesFrom) =>
+            File.WriteAllLines(Path.Combine(dir, KeptMarker), new[]
             {
                 "; Written by R.A.T.S. Flotilla: this copy's own copy of a Workshop item. Steam updates do not change it.",
                 $"WorkshopId={item.SteamId}",
@@ -236,8 +246,91 @@ namespace Flotilla
                 $"FilesFrom={filesFrom.ToString("o", System.Globalization.CultureInfo.InvariantCulture)}",
                 $"KeptOn={DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture)}",
             }, new UTF8Encoding(false));
-            fleet.Log($"kept Workshop item {item.SteamId} in '{install.Name}' as '{folder}'");
-            return folder;
+
+        /// <summary>The Workshop download a kept mod came from, or null when the item is not on this PC (unsubscribed).</summary>
+        public static ModEntry WorkshopOf(Fleet fleet, ModEntry kept)
+        {
+            if (!kept.IsKept) return null;
+            var dir = Path.Combine(WorkshopDir(fleet), kept.KeptFrom.ToString());
+            return Directory.Exists(dir) ? Describe(dir, kept.KeptFrom, false) : null;
+        }
+
+        /// <summary>
+        /// "Refresh from Workshop": replaces a kept mod's files with the current Workshop download; it stays kept (frozen) at that
+        /// state. The new files go next to the old ones first, so a failed copy leaves the kept mod as it was. Updates the entry.
+        /// </summary>
+        public static void Refresh(Fleet fleet, Install install, ModEntry kept)
+        {
+            NeedClosed(fleet, install);
+            if (!kept.IsKept) throw new FlotillaException("Only a kept mod can be refreshed from the Workshop.");
+            var item = WorkshopOf(fleet, kept);
+            if (item == null) throw new FlotillaException($"\"{kept.Name}\" is not subscribed on the Workshop right now, so there is nothing to refresh it from. Subscribe to it in Steam first.");
+            var filesFrom = Newest(item.Dir);
+            var fresh = kept.Dir + ".flotilla-new";
+            var old = kept.Dir + ".flotilla-old";
+            Copier.DeleteTree(fresh);
+            Copier.DeleteTree(old);
+            try
+            {
+                Copier.Copy(fresh, Copier.Scan(item.Dir, (rel, isDir) => true), null, default);
+                WriteMarker(fresh, item, filesFrom);
+                Directory.Move(kept.Dir, old);
+                Directory.Move(fresh, kept.Dir);
+            }
+            catch
+            {
+                if (!Directory.Exists(kept.Dir) && Directory.Exists(old)) Directory.Move(old, kept.Dir);
+                Copier.DeleteTree(fresh);
+                throw;
+            }
+            Copier.DeleteTree(old);
+            var now = Describe(kept.Dir, 0, true);
+            kept.Name = now.Name;
+            kept.Decl = now.Decl;
+            kept.MadeFor = now.MadeFor;
+            kept.KeptAt = now.KeptAt;
+            kept.WorkshopNewer = false;
+            fleet.Log($"refreshed kept '{kept.Folder}' in '{install.Name}' from Workshop item {kept.KeptFrom}");
+        }
+
+        public enum Step { None, Refresh, SwitchOff }
+
+        public sealed class CheckRow
+        {
+            public ModEntry Mod;
+            public bool Fits;
+            public Step Step;
+            /// <summary>For a Refresh: what the Workshop version says it fits.</summary>
+            public string WorkshopFor;
+        }
+
+        /// <summary>
+        /// The mod check against a game version: every mod that is on in the list, whether it fits, and what to do when it does not:
+        /// a kept mod whose Workshop version fits is refreshed, anything else that does not fit is switched off in this copy.
+        /// </summary>
+        public static List<CheckRow> Check(Fleet fleet, IEnumerable<ModEntry> mods, string gameVersion)
+        {
+            var rows = new List<CheckRow>();
+            foreach (var mod in mods.Where(m => m.Enabled && !m.Missing))
+            {
+                var row = new CheckRow { Mod = mod, Fits = mod.Fits(gameVersion) };
+                if (!row.Fits)
+                {
+                    var item = WorkshopOf(fleet, mod);
+                    if (item != null && item.Fits(gameVersion)) { row.Step = Step.Refresh; row.WorkshopFor = item.MadeFor; }
+                    else row.Step = Step.SwitchOff;
+                }
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        /// <summary>Runs the ticked steps: refreshes kept mods (files change at once) and switches mods off in the list (saved by the caller).</summary>
+        public static void Apply(Fleet fleet, Install install, IEnumerable<CheckRow> ticked)
+        {
+            foreach (var row in ticked)
+                if (row.Step == Step.Refresh) Refresh(fleet, install, row.Mod);
+                else if (row.Step == Step.SwitchOff) row.Mod.Enabled = false;
         }
 
         /// <summary>Deletes a mod folder of this copy. Workshop items are never deleted: they belong to every install.</summary>

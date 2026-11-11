@@ -14,7 +14,7 @@ namespace Flotilla
         readonly Install install;
         readonly List<ModEntry> mods;
         readonly ListView list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false, HideSelection = false, CheckBoxes = true };
-        readonly Button up = Btn("Move up"), down = Btn("Move down"), keep = Btn("Keep in this copy"), back = Btn("Use Workshop again"),
+        readonly Button up = Btn("Move up"), down = Btn("Move down"), keep = Btn("Keep in this copy"), refresh = Btn("Refresh from Workshop"), back = Btn("Use Workshop again"), check = Btn("Check game version..."),
             addFolder = Btn("Add folder..."), addZip = Btn("Add zip..."), remove = Btn("Remove...");
 
         public ModsForm(Fleet fleet, Install install, List<ModEntry> mods)
@@ -25,19 +25,21 @@ namespace Flotilla
             Text = $"Mods of \"{install.Name}\" - {Program.Title}";
             Font = SystemFonts.MessageBoxFont;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(880, 500);
+            ClientSize = new Size(960, 540);
             MinimumSize = new Size(600, 400);
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
 
-            list.Columns.Add("Mod (ticked = on, in load order)", 270);
-            list.Columns.Add("Where", 220);
-            list.Columns.Add("Made for", 70);
-            list.Columns.Add("Folder", 140);
+            list.Columns.Add("Mod (ticked = on, in load order)", 230);
+            list.Columns.Add("Where", 210);
+            list.Columns.Add("Made for", 130);
+            list.Columns.Add("Folder", 130);
             list.SelectedIndexChanged += (s, e) => UpdateButtons();
 
-            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 150, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10, 8, 10, 0), WrapContents = false };
-            side.Controls.AddRange(new Control[] { up, down, keep, back, addFolder, addZip, remove });
+            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 170, FlowDirection = FlowDirection.TopDown, Padding = new Padding(10, 8, 10, 0), WrapContents = false };
+            side.Controls.AddRange(new Control[] { up, down, keep, refresh, back, addFolder, addZip, remove, check });
+            refresh.Click += (s, e) => Refresh_();
+            check.Click += (s, e) => Check_();
             keep.Click += (s, e) => Keep_();
             back.Click += (s, e) => Back_();
             up.Click += (s, e) => Move_(-1);
@@ -68,7 +70,7 @@ namespace Flotilla
             Refill(0);
         }
 
-        static Button Btn(string text) => new Button { Text = text, Width = 128, Height = 30, Margin = new Padding(0, 0, 0, 6) };
+        static Button Btn(string text) => new Button { Text = text, Width = 148, Height = 30, Margin = new Padding(0, 0, 0, 6) };
 
         List<ModEntry> Shown => mods.Where(m => !m.Missing).ToList();
 
@@ -97,6 +99,7 @@ namespace Flotilla
             down.Enabled = index >= 0 && index < list.Items.Count - 1;
             keep.Enabled = Selected != null && !Selected.IsLocal;
             back.Enabled = Selected?.IsKept == true;
+            refresh.Enabled = Selected?.IsKept == true;
             remove.Enabled = Selected?.IsLocal == true;
         }
 
@@ -175,6 +178,41 @@ namespace Flotilla
             }
             catch (FlotillaException e) { Warn(e.Message); }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Warn("Could not keep the mod: " + e.Message); }
+        }
+
+        void Refresh_()
+        {
+            var kept = Selected;
+            if (kept == null || !kept.IsKept) return;
+            var item = ModList.WorkshopOf(fleet, kept);
+            if (item == null) { Warn($"\"{kept.Name}\" is not subscribed on the Workshop right now, so there is nothing to refresh it from. Subscribe to it in Steam first."); return; }
+            var version = Game.VersionOf(install.Dir);
+            var answer = MessageBox.Show(this, $"Replace this copy's kept \"{kept.Name}\" ({kept.Where}) with the Workshop download as it is now?" +
+                $"\nThe Workshop version is made for game {item.MadeFor}" + (version == null ? "." : item.Fits(version) ? $", which fits this copy ({version})." : $", which does NOT fit this copy ({version}).") +
+                "\nIt stays kept: later Steam updates still do not change it.",
+                Program.Title, MessageBoxButtons.YesNo, item.Fits(version) ? MessageBoxIcon.Question : MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (answer != DialogResult.Yes) return;
+            try
+            {
+                Keep();
+                int index = list.SelectedIndices[0];
+                ModList.Refresh(fleet, install, kept);
+                Refill(index);
+            }
+            catch (FlotillaException e) { Warn(e.Message); }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Warn("Could not refresh the mod: " + e.Message); }
+        }
+
+        void Check_()
+        {
+            var version = Game.VersionOf(install.Dir);
+            if (version == null) { Warn("The game version of this copy is unknown (no changelog.txt), so there is nothing to check against."); return; }
+            Keep();
+            var rows = ModList.Check(fleet, mods, version);
+            if (rows.Count == 0) { MessageBox.Show(this, "No mod is on in this copy.", Program.Title); return; }
+            using (var dialog = new CheckForm(fleet, install, rows, version, $"Game version of this copy: {version}."))
+                if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Changed)
+                    Refill(list.SelectedIndices.Count == 0 ? 0 : list.SelectedIndices[0]);  // switched-off mods are saved with Save
         }
 
         void Back_()

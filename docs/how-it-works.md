@@ -52,7 +52,14 @@ into it (`WorkshopId`, `Name`, `FilesFrom` = the newest file time of the Worksho
 off in this copy; the kept folder takes its place in the load order and is saved like any local mod (`<name> (kept),True,0`). The
 Mods window reads the marker back and compares `FilesFrom` with the Workshop folder to show "Workshop newer". **Use Workshop again**
 deletes the kept folder and puts the Workshop entry back at its place, with the kept folder's on/off; it needs the item to be
-subscribed. The game's own subscription list cannot be split per copy: it asks Steam for the account's list at every start. Workshop folders are never deleted and the
+subscribed. **Refresh from Workshop** copies the current Workshop folder next to the kept one (`<folder>.flotilla-new`), writes a new
+marker, then swaps the folders, so a failed copy leaves the kept mod as it was.
+
+**The mod check** (`ModList.Check`, `CheckForm`) compares every mod that is on with the copy's game version (`Game.VersionOf`: the
+first dated line of `StreamingAssets\changelog.txt`, e.g. `0.9.0`) using the game's own rule, ported in `Compat.cs` (same logic as
+`tools/modlib/compatver.py` in the mods workspace; checked against each other on real Workshop items). Fits: nothing to do. Kept, does
+not fit, its Workshop folder fits: Refresh. Anything else that does not fit: switch off in this copy. It runs after an **Update** that
+changed the version (and saves the list), and from the Mods window (switched-off mods are saved with Save). The game's own subscription list cannot be split per copy: it asks Steam for the account's list at every start. Workshop folders are never deleted and the
 Steam install is never edited: use the game's own mod menu there.
 
 ## Update

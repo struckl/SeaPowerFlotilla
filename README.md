@@ -27,9 +27,9 @@ Step by step on Steam: the [Flotilla guide](https://steamcommunity.com/sharedfil
 |---|---|
 | **New copy...** | **Clean**: only the game's own files as Steam installs them: no mod loader, no local mods, no missions, fresh settings with no mods enabled. **Copy of my setup**: everything of your Steam install: BepInEx, local mods, missions, settings, the enabled mods with their load order, saves. About 19 GB either way. |
 | **Play** | Starts the selected install (Steam must be running). Flotilla can be closed while you play. |
-| **Mods...** | For one copy: switch mods on or off, set their order, add a mod (a folder or a .zip) to this copy only, remove it again. **Keep in this copy** gives the copy its own copy of a Workshop mod, so Steam updates no longer change it there; **Use Workshop again** goes back. Shows which game version each mod was made for. A copy has to be started once first. |
+| **Mods...** | For one copy: switch mods on or off, set their order, add a mod (a folder or a .zip) to this copy only, remove it again. **Keep in this copy** gives the copy its own copy of a Workshop mod, so Steam updates no longer change it there; **Refresh from Workshop** brings a kept mod up to the Workshop version on purpose; **Use Workshop again** goes back. **Check game version...** checks the copy's mods against its game version. Shows which game version each mod was made for. A copy has to be started once first. |
 | **Rename...** | Gives a copy a name that says what it is for. A desktop shortcut it already has follows the new name. |
-| **Update** | After Steam updated the game: brings the copy's game files up to date. Its mod loader, mods, missions, settings and saves stay. |
+| **Update** | After Steam updated the game: brings the copy's game files up to date. Its mod loader, mods, missions, settings and saves stay. When the game version changed, the mod check follows (below). |
 | **Desktop shortcut** | `Sea Power (<name>)` on the desktop, starts that copy directly. |
 | **Delete...** | Removes a copy for good. The Steam install is never deleted or changed. |
 
@@ -44,6 +44,13 @@ Copies go to `Sea Power Flotilla` next to the Steam library that holds the game 
   that copy as `<name> (kept)` and the Workshop entry is switched off there. Steam updates and unsubscribing no longer change it in
   that copy; the other copies still get the updates. The list shows when it was kept and when the Workshop has a newer download.
   **Use Workshop again** deletes the kept files and switches the Workshop entry back on in the same place of the load order.
+  **Refresh from Workshop** replaces a kept mod with the Workshop download as it is now; it stays kept.
+- **Mods follow the game**: after **Update** moves a copy to a new game version, Flotilla checks every mod that is on in it, the way
+  the game does (`[Compatibility]` in the mod's `_info.ini`). A kept mod that does not fit, whose Workshop version does, is refreshed;
+  a mod with no fitting version is switched off in that copy. Every step can be unticked, and **Leave as is** changes nothing.
+  The same check is in **Mods...** under **Check game version...**. A specific game version for a copy: pick that branch in Steam
+  (Sea Power, Properties, Betas), then **Update** the copy. The Workshop has only each mod's newest version; an older one exists only
+  where you kept it.
   Code mods: Keel loads only the mods switched on, so the kept copy is what runs. Anchor Chain loads every mod DLL it finds and takes
   the newest version, so there the Workshop version can still win; unsubscribe from it, or use Keel in that copy.
 - **A mod for one game version only**: a mod added with **Mods...** exists in that copy alone. Keep one copy per game version (and do not press **Update** on it), and each version has its own mods.

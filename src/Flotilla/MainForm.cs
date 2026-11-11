@@ -309,13 +309,35 @@ namespace Flotilla
         {
             var install = Selected();
             if (install == null || install.IsSteam) return;
+            var before = Game.VersionOf(install.Dir);
             RunBusy($"Updating \"{install.Name}\" to the Steam install's game files", (progress, token) =>
             {
                 var result = fleet.Update(install, progress, token);
                 return result.Copied + result.Deleted == 0
                     ? $"\"{install.Name}\" already had the Steam install's game files."
                     : $"\"{install.Name}\" updated: {result.Copied} files copied, {result.Deleted} removed. Its mods, missions and settings are unchanged.";
-            });
+            }, after: () => CheckAfterUpdate(install, before));
+        }
+
+        /// <summary>After an Update that changed the copy's game version: the mod check, so the mods follow the game.</summary>
+        void CheckAfterUpdate(Install install, string before)
+        {
+            var now = Game.VersionOf(install.Dir);
+            if (now == null || now == before || !ModList.HasSettings(install)) return;
+            try
+            {
+                var mods = ModList.Read(fleet, install);
+                var rows = ModList.Check(fleet, mods, now);
+                if (rows.All(r => r.Step == ModList.Step.None)) { Say(status.Text + $" All its mods that are on fit game {now}."); return; }
+                using (var dialog = new CheckForm(fleet, install, rows, now, $"\"{install.Name}\" is now on game {now} (was {before ?? "?"})."))
+                    if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Changed)
+                    {
+                        ModList.Save(fleet, install, mods);
+                        Say($"\"{install.Name}\" updated to game {now}, its mods checked and adjusted.");
+                    }
+            }
+            catch (FlotillaException e) { Warn(e.Message); }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Warn("The mod check after the update failed: " + e.Message); }
         }
 
         void Shortcut_()
@@ -356,7 +378,7 @@ namespace Flotilla
             }
         }
 
-        async void RunBusy(string what, Func<IProgress<double>, CancellationToken, string> work, bool showBar = true)
+        async void RunBusy(string what, Func<IProgress<double>, CancellationToken, string> work, bool showBar = true, Action after = null)
         {
             busy = new CancellationTokenSource();
             UpdateButtons();
@@ -369,7 +391,8 @@ namespace Flotilla
                 status.Text = $"{what}... {f * 100:0}%";
             });
             var token = busy.Token;
-            try { Say(await Task.Run(() => work(progress, token))); }
+            bool done = false;
+            try { Say(await Task.Run(() => work(progress, token))); done = true; }
             catch (OperationCanceledException) { Say("Cancelled. Nothing was left behind."); }
             catch (FlotillaException e) { Say(""); Warn(e.Message); }
             catch (Exception e) { Settings.Log("error: " + e); Say(""); Warn($"{what} failed: {e.Message}"); }
@@ -381,6 +404,7 @@ namespace Flotilla
                 lastRunning = null;  // keep the result message until the game state changes
                 Refill();
                 if (closeWhenDone) Close();
+                else if (done && after != null) after();
             }
         }
 

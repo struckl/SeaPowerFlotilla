@@ -42,6 +42,19 @@ namespace Flotilla
             return "?";
         }
 
+        /// <summary>"0.9.0" from the same changelog line: the version the game's mod rule compares against. Null when unknown.</summary>
+        public static string VersionOf(string dir)
+        {
+            var changelog = Path.Combine(Streaming(dir), "changelog.txt");
+            if (!File.Exists(changelog)) return null;
+            foreach (var line in File.ReadLines(changelog))
+            {
+                var m = Regex.Match(line, @"^\S+:\s+(\S+)\s+Build\s+(\d+)");
+                if (m.Success) return m.Groups[1].Value;
+            }
+            return null;
+        }
+
         public static bool HasLoader(string dir) =>
             File.Exists(Path.Combine(dir, "winhttp.dll")) || Directory.Exists(Path.Combine(dir, "BepInEx"));
 

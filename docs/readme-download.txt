@@ -16,7 +16,8 @@ USE
   Mods...           For one copy: mods on/off, their order, add a mod folder or .zip to this copy only,
                     or keep a Workshop mod in this copy so Steam updates no longer change it there.
   Rename...         A name that says what the copy is for.
-  Update            After Steam updated the game: brings a copy's game files up to date, keeps its mods and saves.
+  Update            After Steam updated the game: brings a copy's game files up to date, keeps its mods and saves,
+                    then checks its mods against the new game version (refresh kept mods, switch off what does not fit).
   Desktop shortcut  "Sea Power (name)" on the desktop, starts that copy directly.
   Delete...         Removes a copy for good. The Steam install is never touched.
 
