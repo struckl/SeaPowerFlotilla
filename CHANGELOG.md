@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 – 2026-11-11
+
+The mod check no longer ticks "Switch off" by itself: the game only warns about a mod that does not fit its version and still runs
+it on Ignore, and many players run such mods on purpose. Refresh steps stay ticked. Run for real on a copy of a full setup
+(20 Workshop and local mods): copy made, a Workshop mod kept, saved, refreshed, the copy updated to the public beta branch and
+back-checked (a second Update copies nothing), Steam's own install untouched. The windows themselves not clicked through.
+
 ## 0.3.0 – 2026-11-11
 
 Mods follow the game: after **Update** moves a copy to a new game version, Flotilla checks its mods the way the game does and offers

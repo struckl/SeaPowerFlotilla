@@ -306,7 +306,8 @@ namespace Flotilla
 
         /// <summary>
         /// The mod check against a game version: every mod that is on in the list, whether it fits, and what to do when it does not:
-        /// a kept mod whose Workshop version fits is refreshed, anything else that does not fit is switched off in this copy.
+        /// a kept mod whose Workshop version fits is refreshed (ticked), anything else that does not fit can be switched off in this
+        /// copy (unticked: the game only warns about such a mod and still runs it on Ignore).
         /// </summary>
         public static List<CheckRow> Check(Fleet fleet, IEnumerable<ModEntry> mods, string gameVersion)
         {

@@ -8,7 +8,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>SeaPowerFlotilla</AssemblyName>
     <RootNamespace>Flotilla</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Product>R.A.T.S. Flotilla</Product>
     <AssemblyTitle>R.A.T.S. Flotilla - several Sea Power installs</AssemblyTitle>
     <Company>R.A.T.S.</Company>

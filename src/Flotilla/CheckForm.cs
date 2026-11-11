@@ -42,11 +42,11 @@ namespace Flotilla
             {
                 var fit = row.Fits ? $"Yes: {row.Mod.MadeFor}" : $"No: made for {row.Mod.MadeFor}";
                 var step = row.Step == ModList.Step.Refresh ? $"Refresh from the Workshop (that one fits: {row.WorkshopFor})"
-                         : row.Step == ModList.Step.SwitchOff ? (row.Mod.IsKept ? "Switch off (the Workshop version does not fit either)"
-                                                               : row.Mod.IsLocal ? "Switch off (no fitting version known)"
-                                                               : "Switch off (no version for this game yet)")
+                         : row.Step == ModList.Step.SwitchOff ? (row.Mod.IsKept ? "Switch off? (the Workshop version does not fit either)"
+                                                               : row.Mod.IsLocal ? "Switch off? (no fitting version known)"
+                                                               : "Switch off? (no version for this game yet)")
                          : "Nothing to do";
-                var item = new ListViewItem(new[] { row.Mod.Name, row.Mod.Where, fit, step }) { Tag = row, Checked = row.Step != ModList.Step.None, UseItemStyleForSubItems = false };
+                var item = new ListViewItem(new[] { row.Mod.Name, row.Mod.Where, fit, step }) { Tag = row, Checked = row.Step == ModList.Step.Refresh, UseItemStyleForSubItems = false };
                 item.SubItems[2].ForeColor = row.Fits ? Color.DarkGreen : Color.Firebrick;
                 if (row.Step == ModList.Step.None) item.SubItems[3].ForeColor = SystemColors.GrayText;
                 list.Items.Add(item);
@@ -54,7 +54,7 @@ namespace Flotilla
             list.ItemCheck += (s, e) => { if (((ModList.CheckRow)list.Items[e.Index].Tag).Step == ModList.Step.None) e.NewValue = CheckState.Unchecked; };
 
             var note = new Label { Dock = DockStyle.Top, Height = 54, Padding = new Padding(10, 8, 10, 0), Text = intro +
-                "\nThe mods that are on in this copy, checked as the game checks them. Switching off applies to this copy only. Untick what you want to leave as it is." };
+                "\nThe mods that are on in this copy, checked as the game checks them. A mod that does not fit still runs: the game only warns when it starts. Tick Switch off to turn it off in this copy." };
             var apply = new Button { Text = "Apply", Width = 100 };
             var leave = new Button { Text = "Leave as is", Width = 100, DialogResult = DialogResult.Cancel };
             apply.Click += (s, e) => Apply_();

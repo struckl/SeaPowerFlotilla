@@ -58,7 +58,8 @@ marker, then swaps the folders, so a failed copy leaves the kept mod as it was.
 **The mod check** (`ModList.Check`, `CheckForm`) compares every mod that is on with the copy's game version (`Game.VersionOf`: the
 first dated line of `StreamingAssets\changelog.txt`, e.g. `0.9.0`) using the game's own rule, ported in `Compat.cs` (same logic as
 `tools/modlib/compatver.py` in the mods workspace; checked against each other on real Workshop items). Fits: nothing to do. Kept, does
-not fit, its Workshop folder fits: Refresh. Anything else that does not fit: switch off in this copy. It runs after an **Update** that
+not fit, its Workshop folder fits: Refresh (ticked). Anything else that does not fit: switch off in this copy (unticked, because the
+game only warns about a mod that does not fit, `FileManager.CheckCompatibility`, and runs it on Ignore). It runs after an **Update** that
 changed the version (and saves the list), and from the Mods window (switched-off mods are saved with Save). The game's own subscription list cannot be split per copy: it asks Steam for the account's list at every start. Workshop folders are never deleted and the
 Steam install is never edited: use the game's own mod menu there.
 

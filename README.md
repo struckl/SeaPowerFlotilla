@@ -46,10 +46,12 @@ Copies go to `Sea Power Flotilla` next to the Steam library that holds the game 
   **Use Workshop again** deletes the kept files and switches the Workshop entry back on in the same place of the load order.
   **Refresh from Workshop** replaces a kept mod with the Workshop download as it is now; it stays kept.
 - **Mods follow the game**: after **Update** moves a copy to a new game version, Flotilla checks every mod that is on in it, the way
-  the game does (`[Compatibility]` in the mod's `_info.ini`). A kept mod that does not fit, whose Workshop version does, is refreshed;
-  a mod with no fitting version is switched off in that copy. Every step can be unticked, and **Leave as is** changes nothing.
+  the game does (`[Compatibility]` in the mod's `_info.ini`). A kept mod that does not fit, whose Workshop version does, is refreshed
+  (ticked). A mod with no fitting version can be switched off in that copy (unticked: the game only warns about such a mod when it
+  starts and still runs it if you press Ignore). **Leave as is** changes nothing.
   The same check is in **Mods...** under **Check game version...**. A specific game version for a copy: pick that branch in Steam
-  (Sea Power, Properties, Betas), then **Update** the copy. The Workshop has only each mod's newest version; an older one exists only
+  (Sea Power, Properties, Betas: the public beta, or one of the frozen "Release 0.x.y" branches), then **Update** the copy, then switch
+  Steam back. Do not press **Update** on that copy again unless Steam is on the branch you want in it. The Workshop has only each mod's newest version; an older one exists only
   where you kept it.
   Code mods: Keel loads only the mods switched on, so the kept copy is what runs. Anchor Chain loads every mod DLL it finds and takes
   the newest version, so there the Workshop version can still win; unsubscribe from it, or use Keel in that copy.
