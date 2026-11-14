@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -22,18 +21,14 @@ namespace Flotilla
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool AttachConsole(int processId);
 
-        internal static int Run(string[] args)
+        public static int Run(string[] args)
         {
             const int attachParentProcess = -1;
             AttachConsole(attachParentProcess);
-            return Run(args, Settings.LoadFleet, Console.Out, Console.Error);
-        }
 
-        internal static int Run(string[] args, Func<Fleet> loadFleet, TextWriter output, TextWriter error)
-        {
             if (args.Length == 0 || (args.Length == 1 && args[0] is "help" or "--help" or "-h" or "/?"))
             {
-                output.WriteLine(Usage);
+                Console.WriteLine(Usage);
                 return 0;
             }
 
@@ -45,43 +40,43 @@ namespace Flotilla
                 {
                     case ("list", 1, _):
                     case ("list", 2, _) when argument == "--json":
-                        List(loadFleet(), args.Length == 2, output);
+                        List(args.Length == 2);
                         return 0;
                     case ("create", 2, _) or ("create", 3, "--setup") when HasName(argument):
-                        var createFleet = LoadSteamFleet(loadFleet);
-                        output.WriteLine(createFleet.Create(argument, args.Length == 2, null, CancellationToken.None).Dir);
+                        var createFleet = LoadSteamFleet();
+                        Console.WriteLine(createFleet.Create(argument, args.Length == 2, null, CancellationToken.None).Dir);
                         return 0;
                     case ("update", 2, _) when HasName(argument):
-                        var updateFleet = LoadSteamFleet(loadFleet);
+                        var updateFleet = LoadSteamFleet();
                         var result = updateFleet.Update(updateFleet.GetInstall(argument), null, CancellationToken.None);
-                        output.WriteLine($"{result.Copied} files copied, {result.Deleted} removed.");
+                        Console.WriteLine($"{result.Copied} files copied, {result.Deleted} removed.");
                         return 0;
                     case ("play", 2, _) when HasName(argument):
-                        var playFleet = LoadSteamFleet(loadFleet);
+                        var playFleet = LoadSteamFleet();
                         playFleet.Play(playFleet.GetInstall(argument));
                         return 0;
                     case ("delete", 3, "--yes") when HasName(argument):
-                        var deleteFleet = loadFleet();
+                        var deleteFleet = Settings.LoadFleet();
                         var install = deleteFleet.GetInstall(argument);
                         deleteFleet.Delete(install);
-                        output.WriteLine($"Deleted \"{install.Name}\".");
+                        Console.WriteLine($"Deleted \"{install.Name}\".");
                         return 0;
                     case ("delete", 2, _) when HasName(argument):
-                        error.WriteLine("Pass --yes to permanently delete this copy.");
+                        Console.Error.WriteLine("Pass --yes to permanently delete this copy.");
                         return 1;
                     default:
-                        error.WriteLine(Usage);
+                        Console.Error.WriteLine(Usage);
                         return 1;
                 }
             }
             catch (FlotillaException e)
             {
-                error.WriteLine(e.Message);
+                Console.Error.WriteLine(e.Message);
                 return 2;
             }
             catch (Exception e)
             {
-                error.WriteLine(e.Message);
+                Console.Error.WriteLine(e.Message);
                 Settings.Log("command failed: " + e);
                 return 3;
             }
@@ -89,25 +84,25 @@ namespace Flotilla
 
         static bool HasName(string name) => !string.IsNullOrWhiteSpace(name) && !name.StartsWith("-", StringComparison.Ordinal);
 
-        static Fleet LoadSteamFleet(Func<Fleet> loadFleet)
+        static Fleet LoadSteamFleet()
         {
-            var fleet = loadFleet();
+            var fleet = Settings.LoadFleet();
             fleet.RequireSteamGame();
             return fleet;
         }
 
-        static void List(Fleet fleet, bool json, TextWriter output)
+        static void List(bool json)
         {
-            var installs = fleet.List();
+            var installs = Settings.LoadFleet().List();
             if (json)
             {
                 var rows = installs.Select(i => new { name = i.Name, kind = i.Kind, build = i.Build, path = i.Dir });
-                output.WriteLine(new JavaScriptSerializer().Serialize(rows));
+                Console.WriteLine(new JavaScriptSerializer().Serialize(rows));
                 return;
             }
 
             foreach (var install in installs)
-                output.WriteLine($"{install.Name}\t{install.Kind}\t{install.Build}\t{install.Dir}");
+                Console.WriteLine($"{install.Name}\t{install.Kind}\t{install.Build}\t{install.Dir}");
         }
     }
 }

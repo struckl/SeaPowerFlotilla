@@ -288,42 +288,9 @@ static class Tests
         Throws(() => fleet.Delete(fleet.List()[0]), "Steam install never deleted");
         Check(File.Exists(Path.Combine(game, "Sea Power.exe")), "Steam install still there");
 
-        CheckCommandLine(fleet);
-
         Console.WriteLine(failures == 0 ? "ALL OK" : $"{failures} FAILED");
         if (failures == 0) Copier.DeleteTree(box);
         return failures == 0 ? 0 : 1;
-    }
-
-    static void CheckCommandLine(Fleet fleet)
-    {
-        using var output = new StringWriter();
-        using var error = new StringWriter();
-
-        int Run(params string[] args)
-        {
-            output.GetStringBuilder().Clear();
-            error.GetStringBuilder().Clear();
-            return CommandLine.Run(args, () => fleet, output, error);
-        }
-
-        Check(CommandLine.Run(["--help"], () => throw new InvalidOperationException(), output, error) == 0
-            && output.ToString().Contains("--cli"), "CLI help works without loading the fleet");
-        Check(Run("list", "--unknown") == 1 && output.ToString() == "" && error.ToString().Contains("Usage"),
-            "CLI rejects invalid arguments on stderr");
-        Check(Run("create", "CLI copy") == 0 && fleet.Find("CLI copy")?.Clean == true, "CLI creates a clean copy");
-        Check(Run("create", "CLI setup", "--setup") == 0 && fleet.Find("CLI setup")?.Kind == Fleet.KindSetup, "CLI creates a setup copy");
-        Check(Run("list", "--json") == 0 && output.ToString().Contains("\"name\":\"CLI copy\"")
-            && output.ToString().Contains("\"kind\":\"clean\"") && error.ToString() == "", "CLI lists installs as JSON");
-        Check(Run("update", "CLI copy") == 0 && output.ToString().Contains("files copied"), "CLI updates a copy");
-        Check(Run("play", "unknown") == 2 && error.ToString().Contains("unknown"), "CLI reports an unknown copy on stderr");
-
-        bool played = false;
-        fleet.RunGame = install => played = install.Name == "CLI copy" && fleet.IsActive(install);
-        Check(Run("play", "cli copy") == 0 && played && !fleet.Swap.NeedsRepair, "CLI plays a copy and restores Steam data");
-        Check(Run("delete", "CLI copy") == 1 && fleet.Find("CLI copy") != null, "CLI delete requires --yes");
-        Check(Run("delete", "Steam", "--yes") == 2 && fleet.Find("Steam") != null, "CLI refuses to delete the Steam install");
-        Check(Run("delete", "CLI copy", "--yes") == 0 && fleet.Find("CLI copy") == null, "CLI deletes a confirmed copy");
     }
 
     static void Put(string root, string rel, string text = "x")

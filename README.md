@@ -36,29 +36,7 @@ Step by step on Steam: the [Flotilla guide](https://steamcommunity.com/sharedfil
 Copies go to `Sea Power Flotilla` next to the Steam library that holds the game (for example `D:\SteamLibrary\Sea Power Flotilla`);
 **Change...** picks another folder. Steam needs no setup, and Flotilla needs no admin rights.
 
-## Command line
-
-Pass `--cli` to `SeaPowerFlotilla.exe` to use the same Steam install and fleet folder as the window.
-
-```text
-SeaPowerFlotilla.exe --cli help
-SeaPowerFlotilla.exe --cli list [--json]
-SeaPowerFlotilla.exe --cli create "Test copy" [--setup]
-SeaPowerFlotilla.exe --cli update "Test copy"
-SeaPowerFlotilla.exe --cli play "Test copy"
-SeaPowerFlotilla.exe --cli delete "Test copy" --yes
-```
-
-`create` makes a clean copy by default. Pass `--setup` to copy your Steam setup. `update` syncs the game files. To check mods against the new game version, use **Mods... → Check game version...** in the window. `play` needs Steam running and waits for a copy to close before restoring the Steam install's data folder. `play Steam` hands off to Steam and returns.
-
-Windows terminals can return early when they start a GUI executable. Use a waiting invocation in scripts. For example, in PowerShell:
-
-```powershell
-$process = Start-Process .\SeaPowerFlotilla.exe -ArgumentList '--cli list --json' -NoNewWindow -Wait -PassThru
-$process.ExitCode
-```
-
-Use `-RedirectStandardOutput` and `-RedirectStandardError` to capture output in files. Exit codes are `0` for success, `1` for invalid arguments, `2` for a Flotilla error, and `3` for an unexpected failure.
+Run `SeaPowerFlotilla.exe --cli help` to show the available commands.
 
 ## Good to know
 
