@@ -9,12 +9,14 @@ namespace Flotilla
         public const string Title = "R.A.T.S. Flotilla";
 
         /// <summary>
-        /// No arguments: the window. "--play NAME": start that install without a window (desktop shortcuts, the Play button);
-        /// the process stays until the game has closed and then puts the data folder back.
+        /// No arguments: the window. "--play NAME": start an install from a shortcut. "--cli": run a terminal command.
         /// </summary>
         [STAThread]
         static int Main(string[] args)
         {
+            if (args.Length > 0 && (args[0] != "--play" || args.Length < 2))
+                return CommandLine.Run(args[0] == "--cli" ? args.Skip(1).ToArray() : args);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             try
@@ -23,9 +25,8 @@ namespace Flotilla
                 if (args.Length >= 2 && args[0] == "--play")
                 {
                     var name = string.Join(" ", args.Skip(1));
-                    if (fleet.SteamGame == null) throw new FlotillaException("Sea Power was not found in your Steam libraries. Open Flotilla once to locate it.");
-                    var install = fleet.Find(name) ?? throw new FlotillaException($"There is no Sea Power copy called \"{name}\" in {fleet.FleetDir}.");
-                    fleet.Play(install);
+                    fleet.RequireSteamGame();
+                    fleet.Play(fleet.GetInstall(name));
                     return 0;
                 }
                 if (AppHome.HandOver(fleet)) return 0;

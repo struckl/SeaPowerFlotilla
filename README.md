@@ -36,6 +36,8 @@ Step by step on Steam: the [Flotilla guide](https://steamcommunity.com/sharedfil
 Copies go to `Sea Power Flotilla` next to the Steam library that holds the game (for example `D:\SteamLibrary\Sea Power Flotilla`);
 **Change...** picks another folder. Steam needs no setup, and Flotilla needs no admin rights.
 
+Run `SeaPowerFlotilla.exe --cli help` to show the available commands.
+
 ## Good to know
 
 - **Workshop subscriptions** belong to your Steam account, so every copy sees every subscribed item. Which ones are enabled,

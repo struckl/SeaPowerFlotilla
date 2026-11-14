@@ -56,6 +56,14 @@ namespace Flotilla
         public Install Find(string name) =>
             List().FirstOrDefault(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
 
+        internal Install GetInstall(string name) =>
+            Find(name) ?? throw new FlotillaException($"There is no Sea Power copy called \"{name}\" in {FleetDir ?? "the fleet folder"}.");
+
+        internal void RequireSteamGame()
+        {
+            if (SteamGame == null) throw new FlotillaException("Sea Power was not found in your Steam libraries. Open Flotilla once to locate it.");
+        }
+
         static Install ReadMarker(string dir)
         {
             var install = new Install { Name = Path.GetFileName(dir), Dir = dir, Kind = KindSetup };
