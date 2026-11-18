@@ -76,6 +76,6 @@ powershell tools/package.ps1      # builds, runs the offline tests, writes dist/
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Not affiliated with Triassic Games or MicroProse.
+[R.A.T.S. Source License](LICENSE): read it, fork it, send fixes; no re-uploads, no reuse in other projects. Not affiliated with Triassic Games or MicroProse.
 
 *R.A.T.S. – Ratte's Assorted Tactical Systems*

@@ -32,4 +32,5 @@ GOOD TO KNOW
   - Copies are not synced to Steam Cloud.
 
 More: https://github.com/struckl/SeaPowerFlotilla
-MIT License. R.A.T.S. - Ratte's Assorted Tactical Systems
+R.A.T.S. Source License (LICENSE.txt): no re-uploads, no reuse in other projects.
+R.A.T.S. - Ratte's Assorted Tactical Systems
