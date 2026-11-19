@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: the mod check now reads `_info.ini` exactly as the game does, so its "fits / does not fit" matches the game's own warning:
+  - a comment after a version (`GreaterThanEqualToVersion=0.8.7 ; note`) no longer makes a mod "not fit" (Made for shows `0.8.7`)
+  - `[compatibility]` in lower case is ignored, as in the game (Made for: any)
+  - when a key is there twice, or `[Compatibility]` twice, the first one counts, as in the game
+  - a version the game cannot read (`0.9.0-01`) is a "no", as in the game
+  - a version number too big no longer crashes the check
+- Changed (internal): one copy of each name, path rule and message; the version rule in one self-contained file; tests split into steps
+
 ## 0.3.1 - 2026-11-11
 
 The mod check no longer ticks "Switch off" by itself: the game only warns about a mod that does not fit its version and still runs
