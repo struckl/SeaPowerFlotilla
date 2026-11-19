@@ -12,14 +12,40 @@ using Flotilla;
 static class Tests
 {
     static int failures;
+    static bool running;
+    static string box, game, sa, locallow, workshop, ini, cleanIni, keptDir;
+    static Fleet fleet;
+    static DataSwap swap;
+    static Install clean, setup;
+    static ModEntry keptEntry;
 
     static int Main(string[] args)
     {
-        var box = Path.GetFullPath(Path.Combine(args.Length > 0 ? args[0] : Path.GetTempPath(), "flotilla-test"));
+        Setup(args);
+        CreateCopies();
+        InterruptedCopies();
+        PlayAndRepair();
+        UpdateFromSteam();
+        ModsPerCopy();
+        AddAndRemoveMods();
+        KeepInCopy();
+        VersionCheck();
+        CheckAfterUpdate();
+        WorkshopStart();
+        RenameAndDelete();
+        Console.WriteLine(failures == 0 ? "ALL OK" : $"{failures} FAILED");
+        if (failures == 0) Copier.DeleteTree(box);
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>A fake Steam install, LocalLow folder and fleet in a fresh work folder.</summary>
+    static void Setup(string[] args)
+    {
+        box = Path.GetFullPath(Path.Combine(args.Length > 0 ? args[0] : Path.GetTempPath(), "flotilla-test"));
         if (Directory.Exists(box)) Copier.DeleteTree(box);
-        var game = Path.Combine(box, "steamapps", "common", "Sea Power");
-        var sa = Path.Combine(game, "Sea Power_Data", "StreamingAssets");
-        var locallow = Path.Combine(box, "LocalLow", "Triassic Games");
+        game = Path.Combine(box, "steamapps", "common", "Sea Power");
+        sa = Path.Combine(game, "Sea Power_Data", "StreamingAssets");
+        locallow = Path.Combine(box, "LocalLow", "Triassic Games");
 
         Put(game, "Sea Power.exe"); Put(game, "UnityPlayer.dll"); Put(game, "winhttp.dll"); Put(game, "doorstop_config.ini");
         Put(game, @"BepInEx\core\BepInEx.dll"); Put(game, @"BepInEx\LogOutput.log"); Put(game, @"BepInEx\cache\c.dat");
@@ -30,27 +56,31 @@ static class Tests
         Put(locallow, @"Sea Power\usersettings.ini", "steam-settings"); Put(locallow, @"Sea Power\Player.log");
         Put(locallow, @"Sea Power\saves\s1"); Put(locallow, @"Sea Power\CrashDiagnostics\d.txt");
 
-        bool running = false;
+        running = false;
         var log = new List<string>();
-        var fleet = new Fleet
+        fleet = new Fleet
         {
             SteamGame = game, FleetDir = Fleet.DefaultFleetDir(game), Swap = new DataSwap(locallow),
             GameRunning = () => running, SteamRunning = () => true, Log = log.Add,
         };
-        var swap = fleet.Swap;
+        swap = fleet.Swap;
         Check(fleet.FleetDir == Path.Combine(box, "Sea Power Flotilla"), "default fleet folder next to the library");
         Check(fleet.CheckFleetDir(Path.Combine(game, "copies")) != null, "fleet folder inside the game is refused");
         Check(fleet.CheckName("Steam") != null && fleet.CheckName("a/b") != null && fleet.CheckName("My setup 2") == null, "name rules");
+    }
 
-        var clean = fleet.Create("Clean", true, null, CancellationToken.None);
-        var setup = fleet.Create("My setup", false, null, CancellationToken.None);
+    /// <summary>Both kinds of copy, with the files each kind gets.</summary>
+    static void CreateCopies()
+    {
+        clean = fleet.Create("Clean", true, null, CancellationToken.None);
+        setup = fleet.Create("My setup", false, null, CancellationToken.None);
         var c = Tree(clean.Dir); var s = Tree(setup.Dir);
         Console.WriteLine("clean: " + string.Join(", ", c));
         Console.WriteLine("setup: " + string.Join(", ", s));
         Check(!c.Any(x => x.StartsWith("BepInEx") || x == "winhttp.dll" || x == "doorstop_config.ini"), "clean: no mod loader");
-        Check(!c.Any(x => x.Contains(@"\SeaPowerTopo\") || x.Contains(@"\user\") || x.Contains("ACConfigs") || x.Contains(@"\Logs\")), "clean: no mods, user, logs");
+        Check(!c.Any(x => x.Contains("\\SeaPowerTopo\\") || x.Contains("\\user\\") || x.Contains("ACConfigs") || x.Contains("\\Logs\\")), "clean: no mods, user, logs");
         Check(c.Contains(@"Sea Power_Data\StreamingAssets\original\a.ini") && c.Contains(@"Sea Power_Data\StreamingAssets\changelog.txt"), "clean: game data");
-        Check(c.Contains("steam_appid.txt") && c.Contains("flotilla.ini") && !c.Any(x => x.StartsWith(@"UserData\")), "clean: own files, empty UserData");
+        Check(c.Contains("steam_appid.txt") && c.Contains("flotilla.ini") && !c.Any(x => x.StartsWith("UserData\\")), "clean: own files, empty UserData");
         Check(s.Contains(@"BepInEx\core\BepInEx.dll") && s.Contains(@"BepInEx\config\BepInEx.cfg") && s.Contains("winhttp.dll"), "setup: mod loader");
         Check(!s.Any(x => x.Contains("LogOutput") || x.Contains(@"BepInEx\cache")), "setup: no BepInEx logs/cache");
         Check(s.Contains(@"Sea Power_Data\StreamingAssets\SeaPowerTopo\_info.ini") && s.Contains(@"Sea Power_Data\StreamingAssets\user\controls.ini"), "setup: mods and user");
@@ -59,6 +89,11 @@ static class Tests
         Check(fleet.List().Select(i => i.Name).SequenceEqual(new[] { "Steam", "Clean", "My setup" }), "list");
         Check(clean.Clean && !setup.Clean, "kinds read back");
 
+    }
+
+    /// <summary>A cancelled copy and one killed while being made leave nothing behind.</summary>
+    static void InterruptedCopies()
+    {
         // Cancelled create leaves nothing behind
         var cts = new CancellationTokenSource(); cts.Cancel();
         try { fleet.Create("Half", false, null, cts.Token); Check(false, "cancel throws"); }
@@ -78,7 +113,11 @@ static class Tests
         Check(!Directory.Exists(killed) && Directory.Exists(live) && File.Exists(Path.Combine(foreign, "notes.txt")), "unfinished copy removed, others kept");
         Check(fleet.CheckName("Killed") == null, "its name is free again");
         Copier.DeleteTree(live); Copier.DeleteTree(foreign);
+    }
 
+    /// <summary>The data folder swap around a run, and its repair after a crash, a kill or a conflict.</summary>
+    static void PlayAndRepair()
+    {
         // Play a copy: junction during the run, Steam data untouched, copy data written
         fleet.RunGame = install =>
         {
@@ -120,8 +159,11 @@ static class Tests
         var freshFleet = new Fleet { SteamGame = game, FleetDir = fleet.FleetDir, Swap = freshSwap, GameRunning = () => false, SteamRunning = () => true, RunGame = _ => { } };
         freshFleet.Play(clean);
         Check(Directory.Exists(freshSwap.Live) && !DataSwap.IsLink(freshSwap.Live) && !freshSwap.NeedsRepair, "fresh PC: normal afterwards");
+    }
 
-        // Steam update: changed, new and removed game files; mods, loader, missions and data kept; Steam's mods not copied
+    /// <summary>Steam update: changed, new and removed game files; mods, loader, missions and data kept; Steam's mods not copied.</summary>
+    static void UpdateFromSteam()
+    {
         Put(game, @"Sea Power_Data\level0", "v2"); Put(sa, @"original\b.ini", "new"); File.Delete(Path.Combine(sa, @"original\a.ini"));
         Directory.CreateDirectory(Path.Combine(sa, @"original\gone")); Put(setup.Dir, @"Sea Power_Data\StreamingAssets\original\gone2\x.ini");
         Put(sa, "changelog.txt", "02-Dec-2026: 0.8.8 Build 270000\n"); Put(sa, @"NewModInSteam\_info.ini");
@@ -130,7 +172,7 @@ static class Tests
         var r1 = fleet.Update(setup, null, CancellationToken.None);
         var r2 = fleet.Update(clean, null, CancellationToken.None);
         Console.WriteLine($"update setup: {r1.Copied} copied, {r1.Deleted} deleted; clean: {r2.Copied} copied, {r2.Deleted} deleted");
-        s = Tree(setup.Dir); c = Tree(clean.Dir);
+        var s = Tree(setup.Dir); var c = Tree(clean.Dir);
         foreach (var t in new[] { s, c })
         {
             Check(t.Contains(@"Sea Power_Data\StreamingAssets\original\b.ini") && !t.Contains(@"Sea Power_Data\StreamingAssets\original\a.ini"), "update: new and removed game files");
@@ -143,13 +185,16 @@ static class Tests
         Check(s.Contains(@"BepInEx\core\BepInEx.dll") && s.Contains("winhttp.dll") && s.Contains(@"UserData\saves\s1"), "update: loader and saves kept");
         Check(!c.Any(x => x.StartsWith("BepInEx") || x == "winhttp.dll"), "update: clean stays clean");
         Check(fleet.Update(setup, null, CancellationToken.None).Copied == 0, "update twice: nothing to do");
+    }
 
-        // Mods per copy: order and switches kept, other sections untouched, unknown entries preserved, only this copy changes
-        var workshop = Game.WorkshopDir(fleet.SteamGame);
+    /// <summary>Mods per copy: order and switches kept, other sections untouched, unknown entries preserved, only this copy changes.</summary>
+    static void ModsPerCopy()
+    {
+        workshop = Game.WorkshopDir(fleet.SteamGame);
         Check(workshop == Path.Combine(box, "steamapps", "workshop", "content", "1286220"), "Workshop folder found");
         Put(workshop, @"111\_info.ini", "[Language_en]\r\nName=Ship Pack\r\nDescription=d\r\n[Compatibility]\r\nApproximateVersion=0.8.5\r\n"); Put(workshop, @"222\_info.ini");
-        var ini = Path.Combine(setup.DataDir, "usersettings.ini");
-        var cleanIni = Path.Combine(clean.DataDir, "usersettings.ini");
+        ini = Path.Combine(setup.DataDir, "usersettings.ini");
+        cleanIni = Path.Combine(clean.DataDir, "usersettings.ini");
         File.WriteAllText(ini, "[A]\r\nx=1\r\n[LoadOrder]\r\nMod2Directory=111,False,111\r\nMod1Directory=SeaPowerTopo,True,0\r\nMod3Directory=Gone,True,0\r\nNumberOfModFiles=3\r\nother=5\r\n[B]\r\ny=2\r\n");
         File.WriteAllText(cleanIni, "[A]\r\nx=9\r\n");
         var list = ModList.Read(fleet, setup);
@@ -169,6 +214,11 @@ static class Tests
         Check(File.Exists(ini + ".before-flotilla") && File.ReadAllText(ini + ".before-flotilla").Contains("Mod2Directory=111,False,111"), "backup of the first state");
         Check(ModList.Read(fleet, setup)[0].Folder == "111" && File.ReadAllText(cleanIni) == "[A]\r\nx=9\r\n", "reads back; the other copy unchanged");
 
+    }
+
+    /// <summary>Local mods added to one copy, refused names, removal.</summary>
+    static void AddAndRemoveMods()
+    {
         var modSource = Path.Combine(box, "Downloads", "MyMod"); Put(modSource, "_info.ini", "[Language_en]\r\nName=My Mod\r\n"); Put(modSource, @"data\a.ini");
         Check(ModList.Add(fleet, setup, modSource) == "MyMod" && File.Exists(Path.Combine(Game.Streaming(setup.Dir), @"MyMod\data\a.ini")), "add a folder to one copy");
         Check(!Directory.Exists(Path.Combine(Game.Streaming(clean.Dir), "MyMod")) && !Directory.Exists(Path.Combine(sa, "MyMod")), "other copy and Steam install do not get it");
@@ -187,22 +237,25 @@ static class Tests
         Throws(() => ModList.Remove(fleet, setup, ModList.Read(fleet, setup).Single(m => m.Folder == "222")), "Workshop folder never deleted");
         Check(Directory.Exists(Path.Combine(workshop, "222")), "Workshop folder still there");
         running = true;
-        Throws(() => ModList.Save(fleet, setup, list), "no save while the game runs");
+        Throws(() => ModList.Save(fleet, setup, ModList.Read(fleet, setup)), "no save while the game runs");
         Throws(() => ModList.Add(fleet, setup, bad), "no add while the game runs");
         running = false;
         ModList.Remove(fleet, setup, mine);
         Check(!Directory.Exists(Path.Combine(Game.Streaming(setup.Dir), "MyMod")), "local mod removed");
+    }
 
-        // Keep in this copy: the Workshop item's files become this copy's own, marked with where they came from
+    /// <summary>Keep in this copy: the Workshop item's files become this copy's own, marked with where they came from.</summary>
+    static void KeepInCopy()
+    {
         Put(workshop, @"111\data\ship.ini", "v1");
         var oldTime = DateTime.UtcNow.AddDays(-3);
         foreach (var f in Directory.GetFiles(Path.Combine(workshop, "111"), "*", SearchOption.AllDirectories)) File.SetLastWriteTimeUtc(f, oldTime);
         var shipPack = ModList.Read(fleet, setup).Single(m => m.SteamId == 111 && !m.IsLocal);
         Check(ModList.Keep(fleet, setup, shipPack) == "Ship Pack (kept)", "keep: folder named after the mod");
-        var keptDir = Path.Combine(Game.Streaming(setup.Dir), "Ship Pack (kept)");
+        keptDir = Path.Combine(Game.Streaming(setup.Dir), "Ship Pack (kept)");
         Check(File.ReadAllText(Path.Combine(keptDir, @"data\ship.ini")) == "v1" && File.Exists(Path.Combine(keptDir, ModList.KeptMarker)), "keep: files and marker copied");
         Check(!Directory.Exists(Path.Combine(Game.Streaming(clean.Dir), "Ship Pack (kept)")) && Directory.Exists(Path.Combine(workshop, "111")), "keep: other copy and Workshop folder untouched");
-        var keptEntry = ModList.Read(fleet, setup).Single(m => m.Folder == "Ship Pack (kept)");
+        keptEntry = ModList.Read(fleet, setup).Single(m => m.Folder == "Ship Pack (kept)");
         Check(keptEntry.IsLocal && keptEntry.IsKept && keptEntry.KeptFrom == 111 && keptEntry.SteamId == 0 && keptEntry.Name == "Ship Pack", "keep: listed as a kept local mod");
         Check(Math.Abs((keptEntry.KeptAt - oldTime).TotalSeconds) < 2 && !keptEntry.WorkshopNewer && keptEntry.Where.StartsWith("Kept, "), "keep: dated by the Workshop files, not newer yet");
         Throws(() => ModList.Keep(fleet, setup, shipPack), "keep twice refused");
@@ -218,7 +271,11 @@ static class Tests
         running = true;
         Throws(() => ModList.Keep(fleet, setup, shipPack), "no keep while the game runs");
         running = false;
-        // The game's version rule, the Refresh of a kept mod and the check after a game update
+    }
+
+    /// <summary>The game's version rule, the Refresh of a kept mod and the check after a game update.</summary>
+    static void VersionCheck()
+    {
         var approx = Compat.Section("[Compatibility]\r\n;ApproximateVersion=1.0.0\r\nApproximateVersion=0.8.5\r\n");
         var range = Compat.Section("[Language_en]\r\nName=x\r\n[Compatibility]\r\nGreaterThanEqualToVersion=0.8.7\r\nLessThanVersion=0.10.0\r\n");
         Check(Compat.Matches(approx, "0.8.7") && !Compat.Matches(approx, "0.9.0") && !Compat.Matches(approx, "0.8.4"), "rule: ApproximateVersion = same minor, patch up");
@@ -233,6 +290,11 @@ static class Tests
         Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=99999999999.0.0\r\n"), "0.9.3"), "rule: a number too big is unreadable, no crash");
         Check(Game.VersionOf(setup.Dir) == "0.8.8", "game version of a copy from its changelog");
 
+    }
+
+    /// <summary>The mod check against a new game version, Refresh of a kept mod and Use Workshop again.</summary>
+    static void CheckAfterUpdate()
+    {
         File.WriteAllText(Path.Combine(workshop, @"111\_info.ini"), "[Language_en]\r\nName=Ship Pack\r\n[Compatibility]\r\nGreaterThanEqualToVersion=0.9.0\r\n");  // the author's 0.9 version
         Put(Game.Streaming(setup.Dir), @"OldLocal\_info.ini", "[Language_en]\r\nName=Old Local\r\n[Compatibility]\r\nApproximateVersion=0.8.5\r\n");
         var checkList = ModList.Read(fleet, setup);
@@ -261,8 +323,11 @@ static class Tests
         Throws(() => ModList.Read(fleet, fleet.List()[0]), "Steam install not edited");
         File.Delete(cleanIni);
         Throws(() => ModList.Read(fleet, clean), "copy never started: asks to start it once");
+    }
 
-        // Workshop start: recognised, placed outside the Workshop, own item hidden from the mod lists, versions compared as numbers
+    /// <summary>Workshop start: recognised, placed outside the Workshop, own item hidden from the mod lists, versions compared as numbers.</summary>
+    static void WorkshopStart()
+    {
         Check(AppHome.InWorkshop(@"E:\Games\steamapps\workshop\content\1286220\999\SeaPowerFlotilla.exe") && !AppHome.InWorkshop(@"C:\Tools\SeaPowerFlotilla.exe"), "Workshop path recognised");
         Check(AppHome.IsNewer("0.10.0.0", "0.9.0.0") && !AppHome.IsNewer("0.1.0.0", "0.1.0.0") && !AppHome.IsNewer("0.1.0", "0.2.0") && !AppHome.IsNewer("?", "0.1.0"), "versions compared as numbers");
         var ownItem = Path.Combine(workshop, "999"); Put(ownItem, AppHome.ExeName, "new"); Put(ownItem, AppHome.ExeName + ".config", "cfg"); Put(ownItem, "_info.ini");
@@ -270,8 +335,11 @@ static class Tests
         AppHome.Place(Path.Combine(ownItem, AppHome.ExeName), home);
         Check(File.ReadAllText(Path.Combine(home, AppHome.ExeName)) == "new" && File.Exists(Path.Combine(home, AppHome.ExeName + ".config")), "placed, replacing an older copy");
         Check(!ModList.Read(fleet, setup).Any(m => m.Folder == "999"), "Flotilla's own Workshop item is not listed as a mod");
+    }
 
-        // Rename: the folder follows, data stays, other names and states refused
+    /// <summary>Rename: the folder follows, data stays, other names and states refused.</summary>
+    static void RenameAndDelete()
+    {
         var renamed = fleet.Rename(setup, "Pacific (DCM + 80 mods)");
         Check(renamed.Name == "Pacific (DCM + 80 mods)" && Directory.Exists(renamed.Dir) && !Directory.Exists(setup.Dir), "renamed with + and brackets");
         Check(File.Exists(Path.Combine(renamed.DataDir, "usersettings.ini")) && renamed.Kind == setup.Kind, "data and kind kept");
@@ -291,10 +359,6 @@ static class Tests
         Check(!Directory.Exists(clean.Dir) && File.Exists(Path.Combine(outside, "keep.txt")), "delete: copy gone, link target kept");
         Throws(() => fleet.Delete(fleet.List()[0]), "Steam install never deleted");
         Check(File.Exists(Path.Combine(game, "Sea Power.exe")), "Steam install still there");
-
-        Console.WriteLine(failures == 0 ? "ALL OK" : $"{failures} FAILED");
-        if (failures == 0) Copier.DeleteTree(box);
-        return failures == 0 ? 0 : 1;
     }
 
     static void Put(string root, string rel, string text = "x")
