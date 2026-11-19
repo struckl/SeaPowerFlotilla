@@ -51,7 +51,7 @@ namespace Flotilla
             var note = new Label
             {
                 Dock = DockStyle.Top, Height = 74, Padding = new Padding(10, 8, 10, 0), Text =
-                    $"Game version of this copy: {install.Build}. Everything here applies to this copy only." +
+                    $"Game version of this copy: {install.ReadBuild()}. Everything here applies to this copy only." +
                     "\nKeep in this copy: this copy gets its own copy of a Workshop mod. Steam updates and unsubscribing no longer change it here." +
                     (Game.HasLoader(install.Dir) ? "" : "\nThis copy has no mod loader: mods with scripts (DLLs) will not run in it, data mods will."),
             };
@@ -72,7 +72,7 @@ namespace Flotilla
 
         static Button Btn(string text) => new Button { Text = text, Width = 148, Height = 30, Margin = new Padding(0, 0, 0, 6) };
 
-        List<ModEntry> Shown => mods.Where(m => !m.Missing).ToList();
+        List<ModEntry> Listed => mods.Where(m => !m.Missing).ToList();
 
         void Keep()
         {
@@ -83,7 +83,7 @@ namespace Flotilla
         {
             list.BeginUpdate();
             list.Items.Clear();
-            foreach (var mod in Shown)
+            foreach (var mod in Listed)
                 list.Items.Add(new ListViewItem(new[] { mod.Name, mod.Where, mod.MadeFor, mod.Folder }) { Tag = mod, Checked = mod.Enabled });
             if (list.Items.Count > 0) list.Items[Math.Max(0, Math.Min(select, list.Items.Count - 1))].Selected = true;
             list.EndUpdate();
@@ -108,7 +108,7 @@ namespace Flotilla
             var mod = Selected;
             if (mod == null) return;
             Keep();
-            var shown = Shown;
+            var shown = Listed;
             int index = shown.IndexOf(mod);
             var other = shown[index + by];
             int a = mods.IndexOf(mod), b = mods.IndexOf(other);
@@ -138,7 +138,7 @@ namespace Flotilla
                 var fresh = ModList.Read(fleet, install).First(m => m.IsLocal && Flotilla.Layout.Same(m.Folder, folder));
                 fresh.Enabled = true;
                 mods.Add(fresh);
-                Refill(Shown.Count - 1);
+                Refill(Listed.Count - 1);
             }
             catch (FlotillaException e) { Warn(e.Message); }
             catch (Exception e) when (e is IOException || e is InvalidDataException || e is UnauthorizedAccessException) { Warn("Could not add the mod: " + e.Message); }
@@ -173,8 +173,8 @@ namespace Flotilla
                 var kept = ModList.Read(fleet, install).First(m => m.IsLocal && Flotilla.Layout.Same(m.Folder, folder));
                 kept.Enabled = item.Enabled;
                 item.Enabled = false;
-                mods.Insert(mods.IndexOf(item), kept);  // takes the Workshop entry's place in the load order
-                Refill(Shown.IndexOf(kept));
+                mods.Insert(mods.IndexOf(item), kept);
+                Refill(Listed.IndexOf(kept));
             }
             catch (FlotillaException e) { Warn(e.Message); }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Warn("Could not keep the mod: " + e.Message); }
@@ -185,7 +185,7 @@ namespace Flotilla
             var kept = Selected;
             if (kept == null || !kept.IsKept) return;
             var item = ModList.WorkshopOf(fleet, kept);
-            if (item == null) { Warn($"\"{kept.Name}\" is not subscribed on the Workshop right now, so there is nothing to refresh it from. Subscribe to it in Steam first."); return; }
+            if (item == null) { Warn(ModList.NothingToRefresh(kept)); return; }
             var version = Game.VersionOf(install.Dir);
             var answer = MessageBox.Show(this, $"Replace this copy's kept \"{kept.Name}\" ({kept.Where}) with the Workshop download as it is now?" +
                 $"\nThe Workshop version is made for game {item.MadeFor}" + (version == null ? "." : item.Fits(version) ? $", which fits this copy ({version})." : $", which does NOT fit this copy ({version}).") +
@@ -210,7 +210,7 @@ namespace Flotilla
             Keep();
             var rows = ModList.Check(fleet, mods, version);
             if (rows.Count == 0) { MessageBox.Show(this, "No mod is on in this copy.", Program.Title); return; }
-            using (var dialog = new CheckForm(fleet, install, rows, version, $"Game version of this copy: {version}."))
+            using (var dialog = new CheckForm(install.Name, rows, version, $"Game version of this copy: {version}.", ticked => ModList.Apply(fleet, install, ticked)))
                 if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Changed)
                     Refill(list.SelectedIndices.Count == 0 ? 0 : list.SelectedIndices[0]);  // switched-off mods are saved with Save
         }
@@ -222,7 +222,7 @@ namespace Flotilla
             var item = mods.FirstOrDefault(m => !m.IsLocal && !m.Missing && m.SteamId == kept.KeptFrom);
             if (item == null) { Warn($"\"{kept.Name}\" is not subscribed on the Workshop right now. Subscribe to it in Steam first, then try again."); return; }
             var answer = MessageBox.Show(this, $"Delete this copy's kept \"{kept.Name}\" ({kept.Where}) and use the Workshop version again?" +
-                (item.MadeFor.Length > 0 ? $"\nThe Workshop version says it is made for game {item.MadeFor}; this copy is {install.Build}." : ""),
+                (item.MadeFor.Length > 0 ? $"\nThe Workshop version says it is made for game {item.MadeFor}; this copy is {install.ReadBuild()}." : ""),
                 Program.Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
             if (answer != DialogResult.Yes) return;
             try
@@ -232,8 +232,8 @@ namespace Flotilla
                 item.Enabled = kept.Enabled;
                 mods.Remove(item);
                 int at = mods.IndexOf(kept);
-                mods[at] = item;  // the Workshop entry takes the kept one's place
-                Refill(Shown.IndexOf(item));
+                mods[at] = item;
+                Refill(Listed.IndexOf(item));
             }
             catch (FlotillaException e) { Warn(e.Message); }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Warn("Could not remove the kept copy: " + e.Message); }

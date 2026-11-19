@@ -7,6 +7,10 @@ namespace Flotilla
     static class Program
     {
         public const string Title = "R.A.T.S. Flotilla";
+        const string PlayFlag = "--play";
+
+        /// <summary>The command line that starts an install through Flotilla: the Play button and the desktop shortcuts.</summary>
+        public static string PlayArguments(string installName) => $"{PlayFlag} \"{installName}\"";
 
         /// <summary>
         /// No arguments: the window. "--play NAME": start that install without a window (desktop shortcuts, the Play button);
@@ -20,7 +24,7 @@ namespace Flotilla
             try
             {
                 var fleet = Settings.LoadFleet();
-                if (args.Length >= 2 && args[0] == "--play")
+                if (args.Length >= 2 && args[0] == PlayFlag)
                 {
                     var name = string.Join(" ", args.Skip(1));
                     if (fleet.SteamGame == null) throw new FlotillaException("Sea Power was not found in your Steam libraries. Open Flotilla once to locate it.");
@@ -41,7 +45,7 @@ namespace Flotilla
             catch (Exception e)
             {
                 Settings.Log("error: " + e);
-                MessageBox.Show($"Something went wrong:\n\n{e.Message}\n\nDetails are in {Settings.Dir}\\flotilla.log.", Title,
+                MessageBox.Show($"Something went wrong:\n\n{e.Message}\n\nDetails are in {Settings.LogFile}.", Title,
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 3;
             }

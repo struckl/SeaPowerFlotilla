@@ -7,9 +7,9 @@ namespace Flotilla
     /// <summary>settings.ini and flotilla.log in %LOCALAPPDATA%\R.A.T.S. Flotilla.</summary>
     public static class Settings
     {
-        public static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "R.A.T.S. Flotilla");
+        public static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Program.Title);
         static string File_ => Path.Combine(Dir, "settings.ini");
-        static string LogFile => Path.Combine(Dir, "flotilla.log");
+        public static string LogFile => Path.Combine(Dir, "flotilla.log");
 
         public static Dictionary<string, string> Read()
         {
@@ -41,7 +41,7 @@ namespace Flotilla
                 if (File.Exists(LogFile) && new FileInfo(LogFile).Length > 1_000_000) File.Delete(LogFile);
                 File.AppendAllText(LogFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {text}\r\n");
             }
-            catch (IOException) { }
+            catch (IOException) { }  // the log is the place errors go to; when it cannot be written there is nowhere else
         }
 
         /// <summary>The fleet with the saved folders, or the found Steam install and the default fleet folder next to its library.</summary>

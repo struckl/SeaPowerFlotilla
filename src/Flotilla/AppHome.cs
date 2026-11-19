@@ -17,6 +17,9 @@ namespace Flotilla
         public const string ExeName = "SeaPowerFlotilla.exe";
         public static string Dir => Path.Combine(Settings.Dir, "App");
         public static string Exe => Path.Combine(Dir, ExeName);
+        /// <summary>An older copy that is just closing holds its exe for a moment: try this often, this far apart.</summary>
+        const int PlaceAttempts = 20;
+        static readonly TimeSpan PlaceWait = TimeSpan.FromMilliseconds(250);
 
         public static bool InWorkshop(string path) =>
             path.IndexOf($@"\workshop\content\{Game.AppId}\", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -39,7 +42,7 @@ namespace Flotilla
                 for (int attempt = 1; ; attempt++)
                 {
                     try { File.Copy(source, Path.Combine(home, Path.GetFileName(source)), true); break; }
-                    catch (IOException) when (attempt < 20) { Thread.Sleep(250); }
+                    catch (IOException) when (attempt < PlaceAttempts) { Thread.Sleep(PlaceWait); }
                 }
             }
         }
@@ -51,7 +54,7 @@ namespace Flotilla
             try
             {
                 if (InWorkshop(self)) return FromWorkshop(self);
-                if (Layout.Same(Path.GetFullPath(self), Path.GetFullPath(Exe)) && fleet.SteamGame != null) return ToNewerWorkshop(self, fleet);
+                if (Layout.SameFolder(self, Exe) && fleet.SteamGame != null) return ToNewerWorkshop(self, fleet);
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is System.ComponentModel.Win32Exception)
             {
@@ -64,7 +67,7 @@ namespace Flotilla
         {
             bool first = !File.Exists(Exe);
             if (first || IsNewer(VersionOf(self), VersionOf(Exe))) Place(self, Dir);
-            if (first && MessageBox.Show("Put a \"R.A.T.S. Flotilla\" shortcut on your desktop?", Program.Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (first && MessageBox.Show($"Put a \"{Program.Title}\" shortcut on your desktop?", Program.Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 Shortcut.MakeAppShortcut(Exe);
             Process.Start(new ProcessStartInfo(Exe) { UseShellExecute = false })?.Dispose();
             return true;
@@ -72,7 +75,7 @@ namespace Flotilla
 
         static bool ToNewerWorkshop(string self, Fleet fleet)
         {
-            var workshop = ModList.WorkshopDir(fleet);
+            var workshop = Game.WorkshopDir(fleet.SteamGame);
             if (!Directory.Exists(workshop)) return false;
             var own = VersionOf(self);
             var newer = Directory.GetDirectories(workshop).Select(d => Path.Combine(d, ExeName))

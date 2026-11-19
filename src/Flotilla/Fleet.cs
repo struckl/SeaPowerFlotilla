@@ -12,10 +12,10 @@ namespace Flotilla
     {
         public string Name, Dir, Kind;
         public bool IsSteam;
-        public DateTime Created;
 
-        public string DataDir => Path.Combine(Dir, Fleet.DataFolder);
-        public string Build => Game.BuildOf(Dir);
+        public string DataDir => Path.Combine(Dir, Layout.DataFolder);
+        /// <summary>Reads the game's changelog each time: after an Update the same install has a new build.</summary>
+        public string ReadBuild() => Game.BuildOf(Dir);
         public bool Clean => Kind == Fleet.KindClean;
         public string KindText => IsSteam ? "Steam install" : Clean ? "Clean" : "Copy of setup";
     }
@@ -23,11 +23,10 @@ namespace Flotilla
     /// <summary>The Steam install plus the copies in the fleet folder, and everything that can be done with them.</summary>
     public sealed class Fleet
     {
-        public const string Marker = "flotilla.ini";
-        /// <summary>Lies in a copy while it is being made and holds the id of the Flotilla process making it.</summary>
-        public const string UnfinishedMarker = "flotilla.unfinished";
-        public const string DataFolder = "UserData";
-        public const string KindClean = "clean", KindSetup = "setup";
+        public const string KindClean = "clean", KindSetup = "setup", KindSteam = "steam";
+        /// <summary>Free space a new copy leaves on its drive, so the PC and the game still have room to write.</summary>
+        public const long SpareBytes = 1L << 30;
+        public const string ClosedFirst = "Sea Power is running. Close it first.";
 
         public string SteamGame;
         public string FleetDir;
@@ -45,10 +44,10 @@ namespace Flotilla
         {
             var list = new List<Install>();
             if (SteamGame != null && File.Exists(Path.Combine(SteamGame, Game.Exe)))
-                list.Add(new Install { Name = "Steam", Dir = SteamGame, IsSteam = true, Kind = "steam" });
+                list.Add(new Install { Name = "Steam", Dir = SteamGame, IsSteam = true, Kind = KindSteam });
             if (FleetDir != null && Directory.Exists(FleetDir))
                 foreach (var dir in Directory.GetDirectories(FleetDir).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
-                    if (File.Exists(Path.Combine(dir, Game.Exe)) && File.Exists(Path.Combine(dir, Marker)))
+                    if (File.Exists(Path.Combine(dir, Game.Exe)) && File.Exists(Path.Combine(dir, Layout.Marker)))
                         list.Add(ReadMarker(dir));
             return list;
         }
@@ -59,12 +58,10 @@ namespace Flotilla
         static Install ReadMarker(string dir)
         {
             var install = new Install { Name = Path.GetFileName(dir), Dir = dir, Kind = KindSetup };
-            foreach (var line in File.ReadAllLines(Path.Combine(dir, Marker)))
+            foreach (var line in File.ReadAllLines(Path.Combine(dir, Layout.Marker)))
             {
                 var parts = line.Split(new[] { '=' }, 2);
-                if (parts.Length != 2) continue;
-                if (parts[0] == "kind") install.Kind = parts[1].Trim();
-                if (parts[0] == "created") DateTime.TryParse(parts[1].Trim(), out install.Created);
+                if (parts.Length == 2 && parts[0] == "kind") install.Kind = parts[1].Trim();
             }
             return install;
         }
@@ -77,17 +74,17 @@ namespace Flotilla
             if (name.Length > 40) return "Keep the name under 40 characters.";
             if (!Regex.IsMatch(name, @"^[\p{L}\p{N}][\p{L}\p{N} _\-+()&]*$")) return "Use letters, digits, spaces and - _ + ( ) & only.";
             if (string.Equals(name, "Steam", StringComparison.OrdinalIgnoreCase)) return "\"Steam\" is the Steam install itself.";
-            if (FleetDir != null && Directory.Exists(Path.Combine(FleetDir, name))) return $"There is already a folder \"{name}\" in {FleetDir}.";
+            if (NameInUse(name)) return $"There is already a folder \"{name}\" in {FleetDir}.";
             return CheckFleetDir(FleetDir);
         }
+
+        public bool NameInUse(string name) => FleetDir != null && Directory.Exists(Path.Combine(FleetDir, name));
 
         /// <summary>Null if copies can live in this folder: not inside the game (a copy would copy itself) and not inside another copy.</summary>
         public string CheckFleetDir(string dir)
         {
             if (string.IsNullOrEmpty(dir)) return "Choose a folder for the copies.";
-            var full = Path.GetFullPath(dir).TrimEnd('\\') + "\\";
-            var game = Path.GetFullPath(SteamGame).TrimEnd('\\') + "\\";
-            if (full.StartsWith(game, StringComparison.OrdinalIgnoreCase))
+            if (Layout.IsInside(dir, SteamGame))
                 return "The copies cannot live inside the Sea Power folder itself. Choose a folder next to it.";
             return null;
         }
@@ -107,7 +104,7 @@ namespace Flotilla
         public bool EnsureNormal()
         {
             if (!Swap.NeedsRepair) return false;
-            if (GameRunning()) throw new FlotillaException("Sea Power is running. Close it first.");
+            NeedClosed();
             Swap.Repair();
             Log("put the Steam install's data folder back");
             return true;
@@ -125,24 +122,25 @@ namespace Flotilla
             var data = clean ? new CopyPlan() : PlanData();
             Directory.CreateDirectory(FleetDir);
             var need = plan.Bytes + data.Bytes;
-            if (FreeBytes(FleetDir) < need + (1L << 30))
+            if (FreeBytes(FleetDir) < need + SpareBytes)
                 throw new FlotillaException($"Not enough space: the copy needs {Gb(need)} and {Path.GetPathRoot(FleetDir)} has {Gb(FreeBytes(FleetDir))} free.");
             Log($"create {(clean ? "clean" : "setup")} copy '{name}' in {dir}: {plan.Files.Count} files, {Gb(plan.Bytes)}");
             try
             {
                 Directory.CreateDirectory(dir);
-                File.WriteAllText(Path.Combine(dir, UnfinishedMarker), Process.GetCurrentProcess().Id.ToString());
+                File.WriteAllText(Path.Combine(dir, Layout.UnfinishedMarker), Process.GetCurrentProcess().Id.ToString());
                 Copier.Copy(dir, plan, progress, cancel);
-                Copier.Copy(Path.Combine(dir, DataFolder), data, null, cancel);
-                File.WriteAllText(Path.Combine(dir, "steam_appid.txt"), Game.AppId.ToString());
-                File.WriteAllLines(Path.Combine(dir, Marker), new[]
+                Copier.Copy(Path.Combine(dir, Layout.DataFolder), data, null, cancel);
+                Game.WriteAppIdFile(dir);
+                // created= and from= are read by no code: they tell a person looking into the folder what it is.
+                File.WriteAllLines(Path.Combine(dir, Layout.Marker), new[]
                 {
-                    "; R.A.T.S. Flotilla: this folder is a copy of Sea Power. Delete it in Flotilla.",
+                    $"; {Program.Title}: this folder is a copy of Sea Power. Delete it in Flotilla.",
                     $"kind={(clean ? KindClean : KindSetup)}",
                     $"created={DateTime.Now:yyyy-MM-dd HH:mm}",
                     $"from={Game.BuildOf(SteamGame)}",
                 });
-                File.Delete(Path.Combine(dir, UnfinishedMarker));
+                File.Delete(Path.Combine(dir, Layout.UnfinishedMarker));
             }
             catch (Exception)
             {
@@ -160,13 +158,13 @@ namespace Flotilla
         {
             if (FleetDir == null || !Directory.Exists(FleetDir)) return new List<string>();
             return Directory.GetDirectories(FleetDir)
-                .Where(d => File.Exists(Path.Combine(d, UnfinishedMarker)) && !File.Exists(Path.Combine(d, Marker)) && !BeingMade(d))
+                .Where(d => File.Exists(Path.Combine(d, Layout.UnfinishedMarker)) && !File.Exists(Path.Combine(d, Layout.Marker)) && !BeingMade(d))
                 .ToList();
         }
 
         static bool BeingMade(string dir)
         {
-            if (!int.TryParse(File.ReadAllText(Path.Combine(dir, UnfinishedMarker)).Trim(), out var id)) return false;
+            if (!int.TryParse(File.ReadAllText(Path.Combine(dir, Layout.UnfinishedMarker)).Trim(), out var id)) return false;
             try
             {
                 using (var maker = Process.GetProcessById(id))
@@ -186,8 +184,8 @@ namespace Flotilla
         public SyncResult Update(Install install, IProgress<double> progress, CancellationToken cancel)
         {
             if (install.IsSteam) throw new FlotillaException("Steam updates the Steam install itself.");
-            if (GameRunning()) throw new FlotillaException("Sea Power is running. Close it first.");
-            Log($"update '{install.Name}' from {install.Build} to {Game.BuildOf(SteamGame)}");
+            NeedClosed();
+            Log($"update '{install.Name}' from {install.ReadBuild()} to {Game.BuildOf(SteamGame)}");
             var result = Copier.Sync(SteamGame, install.Dir, Layout.IsGame, progress, cancel);
             Log($"update '{install.Name}': {result.Copied} files copied, {result.Deleted} removed");
             return result;
@@ -199,7 +197,7 @@ namespace Flotilla
             if (install.IsSteam) throw new FlotillaException("The Steam install keeps its name.");
             var problem = CheckName(name);
             if (problem != null) throw new FlotillaException(problem);
-            if (GameRunning()) throw new FlotillaException("Sea Power is running. Close it first.");
+            NeedClosed();
             EnsureNormal();
             name = name.Trim();
             Log($"rename '{install.Name}' to '{name}'");
@@ -220,8 +218,13 @@ namespace Flotilla
         }
 
         public bool IsActive(Install install) =>
-            !install.IsSteam && Swap.Switched && string.Equals(
-                Path.GetFullPath(Swap.ActiveCopy ?? "?").TrimEnd('\\'), Path.GetFullPath(install.Dir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            !install.IsSteam && Swap.Switched && Swap.ActiveCopy != null && Layout.SameFolder(Swap.ActiveCopy, install.Dir);
+
+        /// <summary>Throws while Sea Power runs: its files and the data folder are in use.</summary>
+        public void NeedClosed()
+        {
+            if (GameRunning()) throw new FlotillaException(ClosedFirst);
+        }
 
         /// <summary>The checks before a start; throws with the reason if it cannot start now.</summary>
         public void CheckCanPlay()
@@ -240,8 +243,7 @@ namespace Flotilla
                 Process.Start($"steam://rungameid/{Game.AppId}")?.Dispose();
                 return;
             }
-            // With steam_appid.txt next to the exe, Steam accepts a start from outside the library instead of restarting the Steam copy.
-            File.WriteAllText(Path.Combine(install.Dir, "steam_appid.txt"), Game.AppId.ToString());
+            Game.WriteAppIdFile(install.Dir);
             Swap.SwitchTo(install.DataDir, install.Dir);
             Log($"play '{install.Name}'");
             try

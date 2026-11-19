@@ -14,19 +14,16 @@ namespace Flotilla
     /// </summary>
     public sealed class CheckForm : Form
     {
-        readonly Fleet fleet;
-        readonly Install install;
-        readonly List<ModList.CheckRow> rows;
+        readonly Action<List<ModList.CheckRow>> applySteps;
         readonly ListView list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false, CheckBoxes = true };
 
         public bool Changed { get; private set; }
 
-        public CheckForm(Fleet fleet, Install install, List<ModList.CheckRow> rows, string gameVersion, string intro)
+        /// <summary><paramref name="applySteps"/> runs the ticked steps; a FlotillaException or a file error from it keeps the window open.</summary>
+        public CheckForm(string installName, List<ModList.CheckRow> rows, string gameVersion, string intro, Action<List<ModList.CheckRow>> applySteps)
         {
-            this.fleet = fleet;
-            this.install = install;
-            this.rows = rows;
-            Text = $"Mods and game version - \"{install.Name}\" - {Program.Title}";
+            this.applySteps = applySteps;
+            Text = $"Mods and game version - \"{installName}\" - {Program.Title}";
             Font = SystemFonts.MessageBoxFont;
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(960, 400);
@@ -41,12 +38,7 @@ namespace Flotilla
             foreach (var row in rows)
             {
                 var fit = row.Fits ? $"Yes: {row.Mod.MadeFor}" : $"No: made for {row.Mod.MadeFor}";
-                var step = row.Step == ModList.Step.Refresh ? $"Refresh from the Workshop (that one fits: {row.WorkshopFor})"
-                         : row.Step == ModList.Step.SwitchOff ? (row.Mod.IsKept ? "Switch off? (the Workshop version does not fit either)"
-                                                               : row.Mod.IsLocal ? "Switch off? (no fitting version known)"
-                                                               : "Switch off? (no version for this game yet)")
-                         : "Nothing to do";
-                var item = new ListViewItem(new[] { row.Mod.Name, row.Mod.Where, fit, step }) { Tag = row, Checked = row.Step == ModList.Step.Refresh, UseItemStyleForSubItems = false };
+                var item = new ListViewItem(new[] { row.Mod.Name, row.Mod.Where, fit, row.StepText }) { Tag = row, Checked = row.Step == ModList.Step.Refresh, UseItemStyleForSubItems = false };
                 item.SubItems[2].ForeColor = row.Fits ? Color.DarkGreen : Color.Firebrick;
                 if (row.Step == ModList.Step.None) item.SubItems[3].ForeColor = SystemColors.GrayText;
                 list.Items.Add(item);
@@ -75,7 +67,7 @@ namespace Flotilla
             try
             {
                 Cursor = Cursors.WaitCursor;
-                ModList.Apply(fleet, install, ticked);
+                applySteps(ticked);
                 Changed = ticked.Count > 0;
                 DialogResult = DialogResult.OK;
             }

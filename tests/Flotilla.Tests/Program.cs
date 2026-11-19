@@ -42,7 +42,6 @@ static class Tests
         Check(fleet.CheckFleetDir(Path.Combine(game, "copies")) != null, "fleet folder inside the game is refused");
         Check(fleet.CheckName("Steam") != null && fleet.CheckName("a/b") != null && fleet.CheckName("My setup 2") == null, "name rules");
 
-        // Create both kinds
         var clean = fleet.Create("Clean", true, null, CancellationToken.None);
         var setup = fleet.Create("My setup", false, null, CancellationToken.None);
         var c = Tree(clean.Dir); var s = Tree(setup.Dir);
@@ -66,11 +65,11 @@ static class Tests
         catch (OperationCanceledException) { Check(!Directory.Exists(Path.Combine(fleet.FleetDir, "Half")), "cancelled copy removed"); }
 
         // Killed while copying: found and removed by its marker; a live copy, a finished copy and a foreign folder are left alone
-        Check(fleet.Unfinished().Count == 0 && !File.Exists(Path.Combine(setup.Dir, Fleet.UnfinishedMarker)), "finished copies carry no unfinished marker");
+        Check(fleet.Unfinished().Count == 0 && !File.Exists(Path.Combine(setup.Dir, Layout.UnfinishedMarker)), "finished copies carry no unfinished marker");
         var killed = Path.Combine(fleet.FleetDir, "Killed");
-        Put(killed, Fleet.UnfinishedMarker, "999999"); Put(killed, @"Sea Power_Data\level0");
+        Put(killed, Layout.UnfinishedMarker, "999999"); Put(killed, @"Sea Power_Data\level0");
         var live = Path.Combine(fleet.FleetDir, "Live");
-        Put(live, Fleet.UnfinishedMarker, System.Diagnostics.Process.GetCurrentProcess().Id.ToString());
+        Put(live, Layout.UnfinishedMarker, System.Diagnostics.Process.GetCurrentProcess().Id.ToString());
         var foreign = Path.Combine(fleet.FleetDir, "My own folder");
         Put(foreign, "notes.txt");
         Check(fleet.Unfinished().SequenceEqual(new[] { killed }), "only the killed copy counts as unfinished");
@@ -127,7 +126,7 @@ static class Tests
         Directory.CreateDirectory(Path.Combine(sa, @"original\gone")); Put(setup.Dir, @"Sea Power_Data\StreamingAssets\original\gone2\x.ini");
         Put(sa, "changelog.txt", "02-Dec-2026: 0.8.8 Build 270000\n"); Put(sa, @"NewModInSteam\_info.ini");
         Put(setup.Dir, @"Sea Power_Data\StreamingAssets\OnlyHere\_info.ini"); Put(setup.Dir, @"Sea Power_Data\StreamingAssets\user\missions\m.ini");
-        Check(setup.Build == "0.8.7 (build 261021)" && Game.BuildOf(game) == "0.8.8 (build 270000)", "builds read");
+        Check(setup.ReadBuild() == "0.8.7 (build 261021)" && Game.BuildOf(game) == "0.8.8 (build 270000)", "builds read");
         var r1 = fleet.Update(setup, null, CancellationToken.None);
         var r2 = fleet.Update(clean, null, CancellationToken.None);
         Console.WriteLine($"update setup: {r1.Copied} copied, {r1.Deleted} deleted; clean: {r2.Copied} copied, {r2.Deleted} deleted");
@@ -139,14 +138,14 @@ static class Tests
             Check(t.Contains(@"UserData\usersettings.ini") && t.Contains("steam_appid.txt") && t.Contains("flotilla.ini"), "update: own files kept");
         }
         Check(!Directory.Exists(Path.Combine(setup.Dir, @"Sea Power_Data\StreamingAssets\original\gone2")), "update: stale game folder removed");
-        Check(File.ReadAllText(Path.Combine(setup.Dir, @"Sea Power_Data\level0")) == "v2" && setup.Build == "0.8.8 (build 270000)", "update: changed file");
+        Check(File.ReadAllText(Path.Combine(setup.Dir, @"Sea Power_Data\level0")) == "v2" && setup.ReadBuild() == "0.8.8 (build 270000)", "update: changed file");
         Check(s.Contains(@"Sea Power_Data\StreamingAssets\OnlyHere\_info.ini") && s.Contains(@"Sea Power_Data\StreamingAssets\user\missions\m.ini"), "update: copy's mods and missions kept");
         Check(s.Contains(@"BepInEx\core\BepInEx.dll") && s.Contains("winhttp.dll") && s.Contains(@"UserData\saves\s1"), "update: loader and saves kept");
         Check(!c.Any(x => x.StartsWith("BepInEx") || x == "winhttp.dll"), "update: clean stays clean");
         Check(fleet.Update(setup, null, CancellationToken.None).Copied == 0, "update twice: nothing to do");
 
         // Mods per copy: order and switches kept, other sections untouched, unknown entries preserved, only this copy changes
-        var workshop = ModList.WorkshopDir(fleet);
+        var workshop = Game.WorkshopDir(fleet.SteamGame);
         Check(workshop == Path.Combine(box, "steamapps", "workshop", "content", "1286220"), "Workshop folder found");
         Put(workshop, @"111\_info.ini", "[Language_en]\r\nName=Ship Pack\r\nDescription=d\r\n[Compatibility]\r\nApproximateVersion=0.8.5\r\n"); Put(workshop, @"222\_info.ini");
         var ini = Path.Combine(setup.DataDir, "usersettings.ini");

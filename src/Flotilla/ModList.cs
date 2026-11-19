@@ -43,15 +43,13 @@ namespace Flotilla
     {
         const string Section = "[LoadOrder]";
         static readonly Regex Entry = new Regex(@"^Mod(\d+)Directory=(.*)$", RegexOptions.IgnoreCase);
-        static readonly HashSet<string> NotMods = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EntityScenes", "original", "user" };
+        /// <summary>Steam writes a downloaded file with its own time; a kept copy's time may differ by the drive's time resolution.</summary>
+        static readonly TimeSpan TimeSlack = TimeSpan.FromSeconds(2);
 
         static string SettingsFile(Install install) => Path.Combine(install.DataDir, "usersettings.ini");
 
         /// <summary>The game writes its settings on the first start; Flotilla only edits that file, it never invents one.</summary>
         public static bool HasSettings(Install install) => File.Exists(SettingsFile(install));
-
-        public static string WorkshopDir(Fleet fleet) =>
-            Path.GetFullPath(Path.Combine(fleet.SteamGame, "..", "..", "workshop", "content", Game.AppId.ToString()));
 
         public static List<ModEntry> Read(Fleet fleet, Install install)
         {
@@ -76,17 +74,17 @@ namespace Flotilla
         {
             var mods = new List<ModEntry>();
             foreach (var dir in Directory.GetDirectories(Game.Streaming(install.Dir)).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
-                if (!NotMods.Contains(Path.GetFileName(dir)))
+                if (!Layout.NotMods.Contains(Path.GetFileName(dir)))
                     mods.Add(Describe(dir, 0, true));
-            var workshop = WorkshopDir(fleet);
+            var workshop = Game.WorkshopDir(fleet.SteamGame);
             if (Directory.Exists(workshop))
                 foreach (var dir in Directory.GetDirectories(workshop).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
-                    if (ulong.TryParse(Path.GetFileName(dir), out var id) && !File.Exists(Path.Combine(dir, AppHome.ExeName)))  // Flotilla's own item is no mod
+                    if (ulong.TryParse(Path.GetFileName(dir), out var id) && !File.Exists(Path.Combine(dir, AppHome.ExeName)))  // Flotilla's own Workshop item lies there too and is no mod
                         mods.Add(Describe(dir, id, false));
             foreach (var kept in mods.Where(m => m.IsKept))
             {
                 var item = mods.FirstOrDefault(m => !m.IsLocal && m.SteamId == kept.KeptFrom);
-                kept.WorkshopNewer = item != null && Newest(item.Dir) > kept.KeptAt.AddSeconds(2);
+                kept.WorkshopNewer = item != null && Newest(item.Dir) > kept.KeptAt + TimeSlack;
             }
             return mods;
         }
@@ -120,16 +118,25 @@ namespace Flotilla
 
         static ModEntry Describe(string dir, ulong id, bool local)
         {
-            var mod = new ModEntry { Folder = Path.GetFileName(dir), Dir = dir, SteamId = id, IsLocal = local, Name = Path.GetFileName(dir), MadeFor = "" };
-            if (local) ReadMarker(mod);
-            var info = Path.Combine(dir, "_info.ini");
-            if (!File.Exists(info)) return mod;
+            var mod = new ModEntry { Folder = Path.GetFileName(dir), Dir = dir, SteamId = id, IsLocal = local };
+            ReadFiles(mod);
+            return mod;
+        }
+
+        /// <summary>What the mod's own files say: its name, the game versions it fits and, for a local folder, the kept marker.</summary>
+        static void ReadFiles(ModEntry mod)
+        {
+            mod.Name = mod.Folder;
+            mod.MadeFor = "";
+            mod.Decl = new Dictionary<string, string>();
+            if (mod.IsLocal) ReadMarker(mod);
+            var info = Path.Combine(mod.Dir, "_info.ini");
+            if (!File.Exists(info)) return;
             var text = File.ReadAllText(info);
             mod.Decl = Compat.Section(text);
             mod.MadeFor = Compat.Describe(mod.Decl);
             var name = Regex.Match(text, @"\[Language_en\][^\[]*?^Name=(.+?)\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
             if (name.Success) mod.Name = name.Groups[1].Value;
-            return mod;
         }
 
         static IEnumerable<(string folder, bool enabled, ulong id)> SavedOrder(string[] lines)
@@ -198,7 +205,7 @@ namespace Flotilla
                     var info = Directory.GetFiles(temp, "_info.ini", SearchOption.AllDirectories).OrderBy(f => f.Count(c => c == '\\')).FirstOrDefault();
                     if (info == null) throw new FlotillaException("There is no mod in that zip: it has no _info.ini.");
                     var root = Path.GetDirectoryName(info);
-                    var name = Layout.Same(root.TrimEnd('\\'), temp.TrimEnd('\\')) ? Path.GetFileNameWithoutExtension(source) : Path.GetFileName(root);
+                    var name = Layout.SameFolder(root, temp) ? Path.GetFileNameWithoutExtension(source) : Path.GetFileName(root);
                     return CopyIn(fleet, install, root, name);
                 }
                 finally { Copier.DeleteTree(temp); }
@@ -210,7 +217,7 @@ namespace Flotilla
 
         static string CopyIn(Fleet fleet, Install install, string source, string name)
         {
-            if (NotMods.Contains(name) || name.Contains(",") || name.Length == 0) throw new FlotillaException($"A mod cannot be installed under the name \"{name}\".");
+            if (Layout.NotMods.Contains(name) || name.Contains(",") || name.Length == 0) throw new FlotillaException($"A mod cannot be installed under the name \"{name}\".");
             var target = Path.Combine(Game.Streaming(install.Dir), name);
             if (Directory.Exists(target)) throw new FlotillaException($"\"{install.Name}\" already has a mod folder \"{name}\". Remove it first to replace it.");
             Copier.Copy(target, Copier.Scan(source, (rel, isDir) => true), null, default);
@@ -228,7 +235,7 @@ namespace Flotilla
             if (item.IsLocal || item.SteamId == 0) throw new FlotillaException("Only a Workshop mod can be kept in a copy.");
             if (!Directory.Exists(item.Dir)) throw new FlotillaException($"Steam has no files of \"{item.Name}\" on this PC right now.");
             var name = new string(item.Name.Where(c => !Path.GetInvalidFileNameChars().Contains(c) && c != ',').ToArray()).Trim().TrimEnd('.');
-            if (name.Length == 0 || NotMods.Contains(name)) name = item.SteamId.ToString();
+            if (name.Length == 0 || Layout.NotMods.Contains(name)) name = item.SteamId.ToString();
             name += " (kept)";
             var filesFrom = Newest(item.Dir);
             var folder = CopyIn(fleet, install, item.Dir, name);
@@ -237,10 +244,11 @@ namespace Flotilla
             return folder;
         }
 
+        // Name= and KeptOn= are read by no code: they tell a person looking into the folder what it is.
         static void WriteMarker(string dir, ModEntry item, DateTime filesFrom) =>
             File.WriteAllLines(Path.Combine(dir, KeptMarker), new[]
             {
-                "; Written by R.A.T.S. Flotilla: this copy's own copy of a Workshop item. Steam updates do not change it.",
+                $"; Written by {Program.Title}: this copy's own copy of a Workshop item. Steam updates do not change it.",
                 $"WorkshopId={item.SteamId}",
                 $"Name={item.Name}",
                 $"FilesFrom={filesFrom.ToString("o", System.Globalization.CultureInfo.InvariantCulture)}",
@@ -251,7 +259,7 @@ namespace Flotilla
         public static ModEntry WorkshopOf(Fleet fleet, ModEntry kept)
         {
             if (!kept.IsKept) return null;
-            var dir = Path.Combine(WorkshopDir(fleet), kept.KeptFrom.ToString());
+            var dir = Path.Combine(Game.WorkshopDir(fleet.SteamGame), kept.KeptFrom.ToString());
             return Directory.Exists(dir) ? Describe(dir, kept.KeptFrom, false) : null;
         }
 
@@ -264,7 +272,7 @@ namespace Flotilla
             NeedClosed(fleet, install);
             if (!kept.IsKept) throw new FlotillaException("Only a kept mod can be refreshed from the Workshop.");
             var item = WorkshopOf(fleet, kept);
-            if (item == null) throw new FlotillaException($"\"{kept.Name}\" is not subscribed on the Workshop right now, so there is nothing to refresh it from. Subscribe to it in Steam first.");
+            if (item == null) throw new FlotillaException(NothingToRefresh(kept));
             var filesFrom = Newest(item.Dir);
             var fresh = kept.Dir + ".flotilla-new";
             var old = kept.Dir + ".flotilla-old";
@@ -284,14 +292,13 @@ namespace Flotilla
                 throw;
             }
             Copier.DeleteTree(old);
-            var now = Describe(kept.Dir, 0, true);
-            kept.Name = now.Name;
-            kept.Decl = now.Decl;
-            kept.MadeFor = now.MadeFor;
-            kept.KeptAt = now.KeptAt;
+            ReadFiles(kept);
             kept.WorkshopNewer = false;
             fleet.Log($"refreshed kept '{kept.Folder}' in '{install.Name}' from Workshop item {kept.KeptFrom}");
         }
+
+        public static string NothingToRefresh(ModEntry kept) =>
+            $"\"{kept.Name}\" is not subscribed on the Workshop right now, so there is nothing to refresh it from. Subscribe to it in Steam first.";
 
         public enum Step { None, Refresh, SwitchOff }
 
@@ -302,6 +309,14 @@ namespace Flotilla
             public Step Step;
             /// <summary>For a Refresh: what the Workshop version says it fits.</summary>
             public string WorkshopFor;
+
+            /// <summary>The step in words; for a switch-off, why no fitting version is at hand.</summary>
+            public string StepText =>
+                Step == Step.Refresh ? $"Refresh from the Workshop (that one fits: {WorkshopFor})"
+                : Step == Step.None ? "Nothing to do"
+                : Mod.IsKept ? "Switch off? (the Workshop version does not fit either)"
+                : Mod.IsLocal ? "Switch off? (no fitting version known)"
+                : "Switch off? (no version for this game yet)";
         }
 
         /// <summary>
@@ -351,7 +366,7 @@ namespace Flotilla
         static void NeedClosed(Fleet fleet, Install install)
         {
             NeedCopy(install);
-            if (fleet.GameRunning()) throw new FlotillaException("Sea Power is running. Close it first.");
+            fleet.NeedClosed();
         }
     }
 }

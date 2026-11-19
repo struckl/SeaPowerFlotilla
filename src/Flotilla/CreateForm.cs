@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -16,6 +17,7 @@ namespace Flotilla
         readonly Label problem = new Label { AutoSize = true, ForeColor = Color.Firebrick };
         readonly Button ok = new Button { Text = "Create", DialogResult = DialogResult.OK, Width = 100 };
         long cleanBytes = -1, setupBytes = -1;
+        const string CleanName = "Clean", SetupName = "My setup";
 
         public string CopyName => name.Text.Trim();
         public bool Clean => clean.Checked;
@@ -56,8 +58,8 @@ namespace Flotilla
 
             name.Text = Suggest();
             name.TextChanged += (s, e) => Check();
-            clean.CheckedChanged += (s, e) => { if (clean.Checked && name.Text == "My setup") name.Text = Suggest(); Check(); };
-            setup.CheckedChanged += (s, e) => { if (setup.Checked && name.Text == "Clean") name.Text = Suggest(); Check(); };
+            clean.CheckedChanged += (s, e) => { if (clean.Checked && name.Text == SetupName) name.Text = Suggest(); Check(); };
+            setup.CheckedChanged += (s, e) => { if (setup.Checked && name.Text == CleanName) name.Text = Suggest(); Check(); };
             Shown += async (s, e) =>
             {
                 var sizes = await Task.Run(() => (fleet.PlanCopy(true).Bytes, fleet.PlanCopy(false).Bytes + fleet.PlanData().Bytes));
@@ -72,12 +74,11 @@ namespace Flotilla
 
         string Suggest()
         {
-            var basis = clean.Checked ? "Clean" : "My setup";
+            var basis = clean.Checked ? CleanName : SetupName;
             for (int n = 1; ; n++)
             {
                 var candidate = n == 1 ? basis : $"{basis} {n}";
-                if (fleet.CheckName(candidate) == null) return candidate;
-                if (n > 50) return basis;
+                if (!fleet.NameInUse(candidate)) return candidate;
             }
         }
 
@@ -88,9 +89,11 @@ namespace Flotilla
             if (need >= 0)
             {
                 long free = -1;
-                try { free = Fleet.FreeBytes(fleet.FleetDir); } catch (Exception) { }
+                // A drive that is gone or not ready only leaves out the free space; the copy itself checks again.
+                try { free = Fleet.FreeBytes(fleet.FleetDir); }
+                catch (Exception e) when (e is IOException || e is ArgumentException || e is UnauthorizedAccessException) { }
                 space.Text = $"Needs about {Fleet.Gb(need)} in {fleet.FleetDir}" + (free >= 0 ? $" ({Fleet.Gb(free)} free)." : ".");
-                if (why == null && free >= 0 && free < need + (1L << 30)) why = "Not enough free space on that drive. Change the folder in the main window.";
+                if (why == null && free >= 0 && free < need + Fleet.SpareBytes) why = "Not enough free space on that drive. Change the folder in the main window.";
             }
             problem.Text = why ?? "";
             ok.Enabled = why == null && need >= 0;

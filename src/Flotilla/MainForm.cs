@@ -20,9 +20,18 @@ namespace Flotilla
         readonly Label status = new Label { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
         readonly Label fleetLabel = new Label { AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
         readonly ProgressBar bar = new ProgressBar { Width = 220, Dock = DockStyle.Right, Visible = false, Maximum = 1000 };
-        readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 2000 };
+        /// <summary>How often the window looks whether the game runs.</summary>
+        static readonly TimeSpan Poll = TimeSpan.FromSeconds(2);
+        /// <summary>After Play, how long "not running" is not yet news: the game takes a while to appear.</summary>
+        static readonly TimeSpan StartGrace = TimeSpan.FromSeconds(30);
+
+        /// <summary>What the status line shows about the game.</summary>
+        enum GameStatus { Nothing, Docked, Starting, AtSea }
+
+        readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = (int)Poll.TotalMilliseconds };
         CancellationTokenSource busy;
-        string lastRunning = "";  // the status shown last; "" = nothing shown yet
+        GameStatus shown = GameStatus.Nothing;
+        string atSeaText;
         bool closeWhenDone;
         DateTime startedAt;
 
@@ -35,7 +44,9 @@ namespace Flotilla
             ClientSize = new Size(940, 520);
             MinimumSize = new Size(760, 540);
             StartPosition = FormStartPosition.CenterScreen;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
+            // The icon is decoration: without it the window shows the default one.
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+            catch (Exception e) when (e is ArgumentException || e is IOException) { Settings.Log("no window icon: " + e.Message); }
 
             list.Columns.Add("Install", 140);
             list.Columns.Add("Kind", 110);
@@ -116,7 +127,7 @@ namespace Flotilla
                 if (fleet.Swap.NeedsRepair && !fleet.GameRunning() && fleet.EnsureNormal())
                 {
                     Say("The last copy did not close cleanly: your Steam install's settings and saves are back in place.");
-                    lastRunning = null;  // keep this message
+                    shown = GameStatus.Docked;  // keep this message
                 }
             }
             catch (FlotillaException e) { Warn(e.Message); }
@@ -162,7 +173,7 @@ namespace Flotilla
             var steamBuild = Game.BuildOf(fleet.SteamGame);
             foreach (var install in fleet.List())
             {
-                var build = install.Build;
+                var build = install.ReadBuild();
                 var outdated = !install.IsSteam && build != steamBuild;
                 var item = new ListViewItem(new[]
                 {
@@ -200,19 +211,36 @@ namespace Flotilla
         void ShowRunning()
         {
             if (busy != null) return;
-            string text = null;
-            if (fleet.GameRunning())
-            {
-                var active = fleet.List().FirstOrDefault(fleet.IsActive);
-                text = active != null ? $"At sea: \"{active.Name}\". Its settings and saves are in use; the Steam install's come back when the game closes."
+            if (fleet.GameRunning()) ShowAtSea();
+            else ShowDocked();
+        }
+
+        void ShowAtSea()
+        {
+            var active = fleet.List().FirstOrDefault(fleet.IsActive);
+            var text = active != null ? $"At sea: \"{active.Name}\". Its settings and saves are in use; the Steam install's come back when the game closes."
                                       : "At sea: the Steam install.";
-            }
-            if (text == lastRunning) return;
-            if (text == null && DateTime.Now - startedAt < TimeSpan.FromSeconds(30)) return;  // the game takes a while to appear
-            var docked = text == null && !string.IsNullOrEmpty(lastRunning);
-            lastRunning = text;
-            if (docked) Refill();
-            Say(text ?? "In port. Pick an install and press Play.");
+            if (shown == GameStatus.AtSea && text == atSeaText) return;
+            shown = GameStatus.AtSea;
+            atSeaText = text;
+            Say(text);
+        }
+
+        /// <summary>A message shown as Docked stays until the game state changes; a game that just closed refreshes the list.</summary>
+        void ShowDocked()
+        {
+            if (shown == GameStatus.Docked || DateTime.Now - startedAt < StartGrace) return;
+            var cameBack = shown == GameStatus.Starting || shown == GameStatus.AtSea;
+            shown = GameStatus.Docked;
+            if (cameBack) Refill();
+            Say("In port. Pick an install and press Play.");
+        }
+
+        void Starting(string text)
+        {
+            Say(text);
+            shown = GameStatus.Starting;
+            startedAt = DateTime.Now;
         }
 
         void Play()
@@ -221,21 +249,18 @@ namespace Flotilla
             if (install == null || busy != null) return;
             try
             {
-                fleet.CheckCanPlay();
-                fleet.EnsureNormal();
                 if (install.IsSteam)
                 {
                     fleet.Play(install);
-                    Say("Starting the Steam install through Steam...");
-                    lastRunning = "starting";
-                    startedAt = DateTime.Now;
+                    Starting("Starting the Steam install through Steam...");
                     return;
                 }
+                // Checked here too so the reason shows in this window; the --play process checks again for desktop shortcuts.
+                fleet.CheckCanPlay();
+                fleet.EnsureNormal();
                 // A separate Flotilla process waits for the game and puts the data folder back, so this window can be closed.
-                Process.Start(new ProcessStartInfo(Application.ExecutablePath, $"--play \"{install.Name}\"") { UseShellExecute = false })?.Dispose();
-                Say($"Starting \"{install.Name}\"...");
-                lastRunning = "starting";
-                startedAt = DateTime.Now;
+                Process.Start(new ProcessStartInfo(Application.ExecutablePath, Program.PlayArguments(install.Name)) { UseShellExecute = false })?.Dispose();
+                Starting($"Starting \"{install.Name}\"...");
             }
             catch (FlotillaException e) { Warn(e.Message); }
         }
@@ -264,7 +289,7 @@ namespace Flotilla
                     {
                         Refill();
                         Say($"Mods of \"{install.Name}\" saved.");
-                        lastRunning = null;
+                        shown = GameStatus.Docked;
                     }
             }
             catch (FlotillaException e) { Warn(e.Message); }
@@ -283,7 +308,7 @@ namespace Flotilla
                 catch (Exception e) { Warn("Renamed, but the desktop shortcut could not follow: " + e.Message); }
                 Refill();
                 Say($"\"{install.Name}\" is now \"{renamed.Name}\".");
-                lastRunning = null;
+                shown = GameStatus.Docked;
             }
             catch (FlotillaException e) { Warn(e.Message); }
             catch (IOException e) { Warn("Could not rename it. Is one of its files or folders open somewhere?\n\n" + e.Message); }
@@ -329,7 +354,8 @@ namespace Flotilla
                 var mods = ModList.Read(fleet, install);
                 var rows = ModList.Check(fleet, mods, now);
                 if (rows.All(r => r.Step == ModList.Step.None)) { Say(status.Text + $" All its mods that are on fit game {now}."); return; }
-                using (var dialog = new CheckForm(fleet, install, rows, now, $"\"{install.Name}\" is now on game {now} (was {before ?? "?"})."))
+                using (var dialog = new CheckForm(install.Name, rows, now, $"\"{install.Name}\" is now on game {now} (was {before ?? "?"}).",
+                                                  ticked => ModList.Apply(fleet, install, ticked)))
                     if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Changed)
                     {
                         ModList.Save(fleet, install, mods);
@@ -401,7 +427,7 @@ namespace Flotilla
                 busy.Dispose();
                 busy = null;
                 bar.Visible = cancel.Visible = false;
-                lastRunning = null;  // keep the result message until the game state changes
+                shown = GameStatus.Docked;  // keep the result message until the game state changes
                 Refill();
                 if (closeWhenDone) Close();
                 else if (done && after != null) after();
