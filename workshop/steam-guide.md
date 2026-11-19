@@ -3,7 +3,7 @@ DESCRIPTION: Is it the game, or is it your mods? Keep several Sea Power installs
 CATEGORY: Modding
 
 === SECTION: What it is for ===
-[i]R.A.T.S. – Reconnaissance, Acoustics, Terrain & Signals[/i]
+[i]R.A.T.S. - Reconnaissance, Acoustics, Terrain & Signals[/i]
 
 Something broke. Was it the game, or one of the mods you swore were fine? [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3836624723]R.A.T.S. Flotilla[/url] is a small Windows app that keeps several Sea Power installs side by side, each with its own mods, settings and saves.
 
@@ -65,4 +65,4 @@ Want to keep an older version? Don't press Update on that copy.
 
 Found a bug or have an idea? [url=https://hub.sewerlabs.dev/s/flotilla]The R.A.T.S. feedback board[/url]. Source: [url=https://github.com/struckl/SeaPowerFlotilla]GitHub[/url]. Not affiliated with Triassic Games or MicroProse.
 
-[i]R.A.T.S. – Ratte's Assorted Tactical Systems[/i]
+[i]R.A.T.S. - Ratte's Assorted Tactical Systems[/i]

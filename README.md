@@ -1,6 +1,6 @@
 # Sea Power: R.A.T.S. Flotilla
 
-*R.A.T.S. – Reconnaissance, Acoustics, Terrain & Signals*
+*R.A.T.S. - Reconnaissance, Acoustics, Terrain & Signals*
 
 **Bugs, ideas, questions:** [R.A.T.S. feedback board](https://hub.sewerlabs.dev/s/flotilla)
 
@@ -13,7 +13,7 @@ for bug reports, one loaded with a big mod set, one for trying things out, and k
 
 Download `SeaPowerFlotilla-<version>.zip` from [Releases](https://github.com/struckl/SeaPowerFlotilla/releases), unzip it to a
 folder that stays (desktop shortcuts point there) and start `SeaPowerFlotilla.exe`. Nothing to install: it needs .NET Framework 4.8,
-which every Windows 10 and 11 has. The exe is not signed, so Windows may say "unknown publisher": *More info* → *Run anyway*.
+which every Windows 10 and 11 has. The exe is not signed, so Windows may say "unknown publisher": *More info* > *Run anyway*.
 
 Or subscribe on the Steam Workshop and start `SeaPowerFlotilla.exe` once from the item's folder; it moves to `%LOCALAPPDATA%\R.A.T.S. Flotilla\App` and picks up newer Workshop versions by itself.
 
@@ -78,4 +78,4 @@ powershell tools/package.ps1      # builds, runs the offline tests, writes dist/
 
 [R.A.T.S. Source License](LICENSE): read it, fork it, send fixes; no re-uploads, no reuse in other projects. Not affiliated with Triassic Games or MicroProse.
 
-*R.A.T.S. – Ratte's Assorted Tactical Systems*
+*R.A.T.S. - Ratte's Assorted Tactical Systems*

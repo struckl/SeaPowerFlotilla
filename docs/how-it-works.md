@@ -17,7 +17,7 @@ Unity derives `persistentDataPath` from the company and product name, so a plain
 the Steam install's data folder. When a copy starts, Flotilla:
 
 1. checks that no Sea Power runs and that Steam does,
-2. renames `LocalLow\Triassic Games\Sea Power` to `Sea Power.steam` and puts a directory junction `Sea Power` → `<copy>\UserData`
+2. renames `LocalLow\Triassic Games\Sea Power` to `Sea Power.steam` and puts a directory junction `Sea Power` -> `<copy>\UserData`
    in its place (junctions need no admin rights), and notes the copy in `Sea Power.flotilla`,
 3. writes `steam_appid.txt` (1286220) next to the copy's exe, so `SteamAPI.RestartAppIfNecessary` accepts the start instead of
    handing it to the Steam library copy, and starts `<copy>\Sea Power.exe`,
