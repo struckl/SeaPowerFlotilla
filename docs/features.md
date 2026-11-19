@@ -50,5 +50,11 @@ Everything the app does, in full. The short list is in the [README](../README.md
 
 - Steam Cloud syncs the Steam install only. Window size and monitor are shared by all installs.
 - If the PC goes off while a copy runs, your Steam install's settings come back the next time you open Flotilla or start a copy.
-- Details (where Sea Power keeps what, the data folder switch, what Update touches): [docs/how-it-works.md](docs/how-it-works.md).
+- Details (where Sea Power keeps what, the data folder switch, what Update touches): [docs/how-it-works.md](how-it-works.md).
 
+
+## What was run
+
+- Workshop item declares game 0.8.7 up to (not including) 0.10.0.
+- Run with the game on build 261107: copy made, started through Flotilla, Steam data folder back unchanged.
+- 0.3.1 on a copy of a full setup: copy, Keep, Save, Refresh, Update to the public beta and back, Steam install untouched. The windows themselves were not clicked through.
