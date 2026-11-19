@@ -227,6 +227,11 @@ static class Tests
         Check(Compat.Matches(Compat.Section("[Compatibility]\r\nExactVersion=0.9.0\r\n"), "0.9.0") && !Compat.Matches(Compat.Section("[Compatibility]\r\nExactVersion=0.9.0\r\n"), "0.9.1"), "rule: exact");
         Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.8.0\r\nExcludeVersions=0.8.5, 0.9.0\r\n"), "0.9.0"), "rule: excluded version");
         Check(Compat.Matches(new Dictionary<string, string>(), "0.9.0") && Compat.Describe(range) == "0.8.7 up to 0.10.0" && Compat.Describe(approx) == "0.8.5", "rule: no declaration fits; short words");
+        Check(Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.8.7 ; tested on 0.9\r\n"), "0.9.3"), "rule: comment after a value is cut, as in the game");
+        Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nLessThanVersion=0.9.0\r\nLessThanVersion=0.10.0\r\n"), "0.9.3"), "rule: the first of two equal keys counts");
+        Check(Compat.Matches(Compat.Section("[compatibility]\r\nExactVersion=0.8.5\r\n"), "0.9.3"), "rule: section name is case-sensitive");
+        Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.9\r\n"), "0.9.3") && !Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.9.0-01\r\n"), "0.9.3"), "rule: a bound the game cannot read is a no");
+        Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=99999999999.0.0\r\n"), "0.9.3"), "rule: a number too big is unreadable, no crash");
         Check(Game.VersionOf(setup.Dir) == "0.8.8", "game version of a copy from its changelog");
 
         File.WriteAllText(Path.Combine(workshop, @"111\_info.ini"), "[Language_en]\r\nName=Ship Pack\r\n[Compatibility]\r\nGreaterThanEqualToVersion=0.9.0\r\n");  // the author's 0.9 version
