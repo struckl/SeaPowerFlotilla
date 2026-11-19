@@ -8,6 +8,8 @@
   - when a key is there twice, or `[Compatibility]` twice, the first one counts, as in the game
   - a version the game cannot read (`0.9.0-01`) is a "no", as in the game
   - a version number too big no longer crashes the check
+- Fixed: Made for shows the lower bound the game itself uses when both lower keys are set (`GreaterThanVersion` first, shown as `above 0.9.3`)
+- Fixed: the main window's "Local mods" count includes Anchor Chain's `ACConfigs` folder, as the game and the Mods window list it
 - Changed (internal): one copy of each name, path rule and message; the version rule in one self-contained file; tests split into steps
 
 ## 0.3.1 - 2026-11-11

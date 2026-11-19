@@ -57,15 +57,15 @@ namespace Flotilla
             File.Exists(Path.Combine(dir, "winhttp.dll")) || Directory.Exists(Path.Combine(dir, "BepInEx"));
 
         /// <summary>
-        /// The count in the main list: mod folders in StreamingAssets, without Anchor Chain's ACConfigs folder. The game itself lists
-        /// ACConfigs as a mod (and so does the Mods window); whether the count should too is open.
+        /// The count in the main list: mod folders in StreamingAssets, Anchor Chain's ACConfigs folder included, as the game and the
+        /// Mods window list it.
         /// </summary>
         public static List<string> LocalMods(string dir)
         {
             var streaming = Streaming(dir);
             if (!Directory.Exists(streaming)) return new List<string>();
             return Directory.GetDirectories(streaming).Select(Path.GetFileName)
-                .Where(n => !Layout.NotMods.Contains(n) && !Layout.Same(n, "ACConfigs"))
+                .Where(n => !Layout.NotMods.Contains(n))
                 .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
         }
     }

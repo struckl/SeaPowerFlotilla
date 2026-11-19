@@ -135,7 +135,8 @@ namespace Flotilla
             if (decl == null || decl.Count == 0) return "any";
             if (Get(decl, "ExactVersion") != null) return "only " + Get(decl, "ExactVersion");
             if (Get(decl, "ApproximateVersion") != null) return Get(decl, "ApproximateVersion");
-            var low = Get(decl, "GreaterThanEqualToVersion") ?? (Get(decl, "GreaterThanVersion") != null ? "above " + Get(decl, "GreaterThanVersion") : null);
+            // Same order as Lower: GreaterThanVersion is the bound the game uses when both keys are set.
+            var low = Get(decl, "GreaterThanVersion") != null ? "above " + Get(decl, "GreaterThanVersion") : Get(decl, "GreaterThanEqualToVersion");
             var high = Get(decl, "LessThanVersion") != null ? "up to " + Get(decl, "LessThanVersion")
                      : Get(decl, "LessThanEqualToVersion") != null ? "up to and with " + Get(decl, "LessThanEqualToVersion") : null;
             var text = string.Join(" ", new[] { low, high }.Where(s => s != null));

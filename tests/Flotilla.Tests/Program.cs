@@ -288,6 +288,7 @@ static class Tests
         Check(Compat.Matches(Compat.Section("[compatibility]\r\nExactVersion=0.8.5\r\n"), "0.9.3"), "rule: section name is case-sensitive");
         Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.9\r\n"), "0.9.3") && !Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=0.9.0-01\r\n"), "0.9.3"), "rule: a bound the game cannot read is a no");
         Check(!Compat.Matches(Compat.Section("[Compatibility]\r\nGreaterThanEqualToVersion=99999999999.0.0\r\n"), "0.9.3"), "rule: a number too big is unreadable, no crash");
+        Check(Compat.Describe(Compat.Section("[Compatibility]\r\nGreaterThanVersion=0.9.3\r\nGreaterThanEqualToVersion=0.9.0\r\n")) == "above 0.9.3", "rule: Made for shows the lower bound the game uses");
         Check(Game.VersionOf(setup.Dir) == "0.8.8", "game version of a copy from its changelog");
 
     }
