@@ -4,13 +4,14 @@ A Windows app that keeps several Sea Power installs on one PC, each with its own
 
 | | |
 | --- | --- |
+| Questions | [R.A.T.S. Discord](https://discord.gg/CzuHd4f8Yf): help, ideas, talk; the first place to ask |
 | Version | `0.3.1` (2026-11-11) |
 | Game | Sea Power 0.8.7 up to (not including) 0.10.0; run with build 261107 (2026-11-09) and the public beta in 0.3.1 (2026-11-11) |
 | Needs | Windows 10 or 11 (.NET Framework 4.8) and a Steam install of Sea Power; not a game mod, no mod loader |
 | Get it | [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3836624723) or [GitHub Releases](https://github.com/struckl/SeaPowerFlotilla/releases) |
 | Settings | none; the copy folder is chosen with Change... in the main window |
 | Guide | [Flotilla guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3836683383) |
-| Feedback | [R.A.T.S. feedback board](https://hub.sewerlabs.dev/s/flotilla) |
+| Bug reports | [R.A.T.S. feedback board](https://hub.sewerlabs.dev/s/flotilla) |
 | Source | R.A.T.S. Source License, see `LICENSE` |
 
 ![Flotilla](docs/flotilla.png)
